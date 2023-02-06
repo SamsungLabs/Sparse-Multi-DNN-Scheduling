@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader
 import torchvision
 from torchvision import transforms, datasets
 from onnx2torch import convert
+import matplotlib.pyplot as plt
 
 def collect_sparse(args):
   # Define or Load Models
@@ -36,26 +37,59 @@ def collect_sparse(args):
 
   target_module_list = [nn.ReLU]
   model, intern_hooks = Stat_Collector.insert_hook(model, target_module_list)
-  input_sparsities = [0.1, 0.9]
+  input_sparsities = [0.1, 0.3, 0.5, 0.7, 0.9]
   means_sparse = [[] for i in range(len(intern_hooks))] 
   stddev_sparse = [[] for i in range(len(intern_hooks))]
   with torch.no_grad():
+    layer_sparsities = []
+    network_sparsities = []
     for input_sparsity in input_sparsities:
+      layer_sparsity = [[] for i in range(len(intern_hooks))]
+      network_sparsity = []
       sparsities = [[] for i in range(len(intern_hooks))] 
       for iter in range(args.num_samples):
         x = create_sparse_tensor((1, 3, img_size, img_size), input_sparsity)
         # print ("input sparsity:", cal_sparsity_tensor(x))
         output = model(x)
+        sum_sparsity = 0.0 # Calculate network sparsity per sample
         for i, hook in enumerate(intern_hooks):
-          sparsities[i].append(hook.sparsity)
-      for i, sparsity in enumerate(sparsities):
-        # print (i, "th layer with mean ", np.mean(sparsity), " and variance ", np.var(sparsity), np.std(sparsity))
-        means_sparse[i].append(np.mean(sparsity))
-        stddev_sparse[i].append(np.std(sparsity))
-        # print (sparsity)
-    for i, mean_sparse in enumerate(means_sparse):
-      dif = np.abs(np.max(mean_sparse) - np.min(mean_sparse))
-      print (i, "th layer, largest mean diff is ", dif)
+          sparsity = (hook.sparsity).numpy()
+          sum_sparsity += sparsity
+          layer_sparsity[i].append(sparsity)
+        network_sparsity.append(sum_sparsity/len(intern_hooks))
+      
+      layer_sparsities.append(layer_sparsity)
+      network_sparsities.append(network_sparsity)
+ 
+
+  # Analyse the sparsity distribution
+
+  #  Draw Intra dataset network sparsity distribution
+  # for i in range(len(input_sparsities )):
+  #   plt.hist(network_sparsities[i], density=True)  # density=False would make counts
+  #   plt.ylabel('Probability')
+  #   plt.xlabel('Data')
+  #   plt.show()  
+
+  #  Draw Inter dataset network sparsity distribution
+  # interdata_network_sparsities = []
+  # for i in range(len(input_sparsities )):
+  #   interdata_network_sparsities += network_sparsities[i]
+  # plt.hist(interdata_network_sparsities, density=True)  # density=False would make counts
+  # plt.ylabel('Probability')
+  # plt.xlabel('Data')
+  # plt.show()  
+
+  #  Draw Inter dataset layer sparsity distribution
+  interdata_layer_sparsities = [[] for i in range(len(intern_hooks))]
+  for i in range(len(intern_hooks)):
+    for j in range(len(input_sparsities)):
+      interdata_layer_sparsities[i] += layer_sparsities[j][i]
+    plt.hist(interdata_layer_sparsities[i], density=True)  # density=False would make counts
+    plt.ylabel('Probability')
+    plt.xlabel('Data')
+    plt.show()  
+
 
 if __name__ == '__main__':
   # Let's allow the user to pass the filename as an argument
