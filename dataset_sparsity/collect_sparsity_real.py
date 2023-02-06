@@ -42,7 +42,8 @@ def collect_sparse(args):
     transforms.ToTensor(),
     transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225]),
   ])
-  data_root = '/home/CORP/hongxiang.f/Documents/dataset_samples'
+  # data_root = '/home/CORP/hongxiang.f/Documents/dataset_samples'
+  data_root = args.dataset_root
   dataset_paths =  [data_root + '/darkface', data_root + '/coco', data_root + '/exdark', data_root + '/imagenet']
 
   # Insert hooks to collect intermediate results and calculate sparsity
@@ -112,6 +113,7 @@ if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   parser.add_argument("--dataset_name", default="darkface", type=str, help="The name of dataset to collect sparsity", choices=["mscoco", "darkface", "imagenet"])
   parser.add_argument("--model_name", default="inceptionv3", type=str, help="The name of model to collect sparsity", choices=["ssd", "ssdlite", "resnet", "mobilenetv1", "mobilenetv2", "vgg", "inceptionv3"])
+  parser.add_argument("--dataset_root", default="/path/to/your/directory", type=str, help="The path to your dataset root")
   parser.add_argument("--num_samples", default=50, type=int, help="The number of samples from the dataset to calculate sparsity")
   parser.add_argument("--batch_size", default=1, type=int, help="Batch size")
 
