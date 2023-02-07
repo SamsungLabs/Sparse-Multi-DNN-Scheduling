@@ -47,7 +47,7 @@ def collect_sparse(args):
   dataset_paths =  [data_root + '/darkface', data_root + '/coco', data_root + '/exdark', data_root + '/imagenet']
 
   # Insert hooks to collect intermediate results and calculate sparsity
-  target_module_list = [nn.ReLU]
+  target_module_list = [nn.Conv2d]
   model, intern_hooks = Stat_Collector.insert_hook(model, target_module_list)
   input_sparsities = [0, 1]
   means_sparse = [[] for i in range(len(intern_hooks))] 
@@ -81,14 +81,15 @@ def collect_sparse(args):
 
   # Analyse the sparsity distribution
 
-  #  Draw Per dataset network sparsity distribution
+  #  Draw intra (in) dataset network sparsity distribution
   # for i in range(len(dataset_paths)):
   #   plt.hist(network_sparsities[i], density=True)  # density=False would make counts
   #   plt.ylabel('Probability')
   #   plt.xlabel('Data')
   #   plt.show()  
 
-  #  Draw cross dataset network sparsity distribution
+  #  Draw inter (cross) dataset network sparsity distribution
+
   # cross_network_sparsities = []
   # for i in range(len(dataset_paths)):
   #   cross_network_sparsities += network_sparsities[i]
@@ -97,11 +98,13 @@ def collect_sparse(args):
   # plt.xlabel('Data')
   # plt.show()  
 
-  #  Draw Inter dataset layer sparsity distribution
+  #  Draw inter (cross) dataset layer sparsity distribution
+  
   interdata_layer_sparsities = [[] for i in range(len(intern_hooks))]
   for i in range(len(intern_hooks)):
     for j in range(len(dataset_paths)):
       interdata_layer_sparsities[i] += layer_sparsities[j][i]
+    # print ("Num of Samples:", len(interdata_layer_sparsities[i]))
     plt.hist(interdata_layer_sparsities[i], density=True)  # density=False would make counts
     plt.ylabel('Probability')
     plt.xlabel('Data')

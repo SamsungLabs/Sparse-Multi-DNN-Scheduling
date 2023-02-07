@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import sys
 
 def cal_sparsity_tensor(t):
   num_pixel = torch.numel(t)
@@ -23,8 +24,30 @@ class Stat_Collector:
     self.out_features = outp.clone()
     self.in_features = inp
     self.m = m
-    self.sparsity = cal_sparsity_tensor(outp)
-    # print (m, "with sparsity ", self.sparsity)
+    if (isinstance(self.m, nn.ReLU)):
+      # ReLU Sparsity
+      self.sparsity = cal_sparsity_tensor(outp)
+      # print ("ReLU Sparsity:", self.sparsity)
+    elif (isinstance(self.m, nn.Conv2d)):
+      w_shape = self.m.weight.shape
+      o_shape = self.out_features.shape
+      self.t_mac = w_shape.numel() * o_shape[-1] * o_shape[-1] * o_shape[0] # total mac counts Filter * Channel * Kernel_size * Kernel_size * Output_size * Output_size * Bath_size
+      w_mask = torch.where(self.m.weight != 0, torch.tensor(1.0), torch.tensor(0.0))
+      i_mask = torch.where(self.in_features[0] != 0, torch.tensor(1.0), torch.tensor(0.0))
+      self.v_mac = torch.nn.functional.conv2d(i_mask, w_mask, padding=self.m.padding, stride=self.m.stride).sum()
+      # Conv Sparsity
+      self.sparsity = 1- self.v_mac/self.t_mac
+      # print ("total mac:", self.t_mac, " valid mac:", self.v_mac)
+      # print ("Conv Sparsity:", self.sparsity)
+      if (self.sparsity > 1  or self.sparsity <0):
+        print ("w_shape:", w_shape)
+        print ("o_shape:", o_shape)
+        print ("total mac:", self.t_mac, " valid mac:", self.v_mac)
+        print ("input mask", i_mask.shape)
+        print ("weight mask", w_mask.shape)
+        sys.exit(0)
+    else:
+      raise NameError("Hook Layer not supported")
   def remove(self):
     self.handle.remove()
 
