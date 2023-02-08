@@ -1,12 +1,15 @@
 import torch
 import torch.nn as nn
 import sys
+import numpy as np
 
 def cal_sparsity_tensor(t):
   num_pixel = torch.numel(t)
-  num_nonzero = torch.count_nonzero(t)
-  # print ("num_pixel:", num_pixel)
-  # print ("num_nonzero:", num_nonzero)
+  if (t.dtype is torch.float32):
+    num_nonzero = torch.count_nonzero(t)
+  elif (t.dtype is torch.quint8):
+    num_nonzero = np.count_nonzero(torch.int_repr(t).numpy())
+  else: raise ValueeError("Data type for counting non-zero not supported")
   sparsity = 1 - num_nonzero/num_pixel
   # print (sparsity)
   return sparsity
@@ -24,7 +27,7 @@ class Stat_Collector:
     self.out_features = outp.clone()
     self.in_features = inp
     self.m = m
-    if (isinstance(self.m, nn.ReLU)):
+    if (isinstance(self.m, nn.ReLU) or isinstance(self.m, torch.nn.intrinsic.quantized.modules.conv_relu.ConvReLU2d)):
       # ReLU Sparsity
       self.sparsity = cal_sparsity_tensor(outp)
       # print ("ReLU Sparsity:", self.sparsity)
