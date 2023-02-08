@@ -21,7 +21,8 @@ def collect_sparse(args):
     model = convert("./models/ssd_prunned/deployment/model.onnx")
     img_size = 300
   elif (args.model_name == "resnet"):
-    model = convert("./models/resnet_pruned_nonquant/deployment/model.onnx")
+    # model = convert("./models/resnet_pruned_nonquant/deployment/model.onnx")
+    model = torchvision.models.resnet50(pretrained=True)
   elif (args.model_name == "mobilenetv1"):
     model = convert("./models/mobilenetv1_prunned/deployment/model.onnx")
   elif (args.model_name == "mobilenetv2"):
@@ -81,22 +82,27 @@ def collect_sparse(args):
 
   # Analyse the sparsity distribution
 
+
   #  Draw intra (in) dataset network sparsity distribution
-  # for i in range(len(dataset_paths)):
-  #   plt.hist(network_sparsities[i], density=True)  # density=False would make counts
-  #   plt.ylabel('Probability')
-  #   plt.xlabel('Data')
-  #   plt.show()  
+
+  fig,axs = plt.subplots(4, figsize=(9,20))
+  for i in range(len(dataset_paths)):
+    axs[i].hist(network_sparsities[i], density=True)  # density=False would make counts
+    axs[i].set_ylabel('Probability')
+    axs[i].set_xlabel(dataset_paths[i][-4:])
+  fig.savefig(args.figs_path + args.model_name + "_intra_network_sparsity.png")
+  plt.close()
 
   #  Draw inter (cross) dataset network sparsity distribution
 
-  # cross_network_sparsities = []
-  # for i in range(len(dataset_paths)):
-  #   cross_network_sparsities += network_sparsities[i]
-  # plt.hist(cross_network_sparsities, density=True)  # density=False would make counts
-  # plt.ylabel('Probability')
-  # plt.xlabel('Data')
-  # plt.show()  
+  cross_network_sparsities = []
+  for i in range(len(dataset_paths)):
+    cross_network_sparsities += network_sparsities[i]
+  plt.hist(cross_network_sparsities, density=True)  # density=False would make counts
+  plt.ylabel('Probability')
+  plt.xlabel('Cross_Data_Sparsity')
+  plt.savefig(args.figs_path + args.model_name + "_inter_network_sparsity.png")
+
 
   #  Draw inter (cross) dataset layer sparsity distribution
   
@@ -107,8 +113,9 @@ def collect_sparse(args):
     # print ("Num of Samples:", len(interdata_layer_sparsities[i]))
     plt.hist(interdata_layer_sparsities[i], density=True)  # density=False would make counts
     plt.ylabel('Probability')
-    plt.xlabel('Data')
-    plt.show()  
+    plt.xlabel('Layer_Sparsity')
+    # plt.show()  
+  plt.savefig(args.figs_path + args.model_name + "_layer_sparsity.png")
 
 
 if __name__ == '__main__':
@@ -117,6 +124,7 @@ if __name__ == '__main__':
   parser.add_argument("--dataset_name", default="darkface", type=str, help="The name of dataset to collect sparsity", choices=["mscoco", "darkface", "imagenet"])
   parser.add_argument("--model_name", default="inceptionv3", type=str, help="The name of model to collect sparsity", choices=["ssd", "ssdlite", "resnet", "mobilenetv1", "mobilenetv2", "vgg", "inceptionv3"])
   parser.add_argument("--dataset_root", default="/path/to/your/directory", type=str, help="The path to your dataset root")
+  parser.add_argument("--figs_path", default="/path/to/your/directory", type=str, help="The path to all saved figures/images")
   parser.add_argument("--num_samples", default=50, type=int, help="The number of samples from the dataset to calculate sparsity")
   parser.add_argument("--batch_size", default=1, type=int, help="Batch size")
 

@@ -9,6 +9,7 @@ import torchvision
 from torchvision import transforms, datasets
 from onnx2torch import convert
 import matplotlib.pyplot as plt
+import sparseml
 
 def collect_sparse(args):
   # Define or Load Models
@@ -23,6 +24,14 @@ def collect_sparse(args):
   elif (args.model_name == "resnet"):
     # model = convert("./models/resnet_pruned_nonquant/deployment/model.onnx")
     # model = convert("./models/resnet_pruned_quant/model.onnx")
+    prunned_model = torch.load("./models/resnet_pruned_nonquant/training/model.pth")
+    model = sparseml.pytorch.models.resnet50()
+    print (prunned_model['state_dict'].keys())
+    print (model.state_dict().keys())
+    sys.exit(0)
+    model.load_state_dict(prunned_model)
+    print (model)
+    
     model = torchvision.models.resnet50(pretrained=True)
   elif (args.model_name == "mobilenetv1"):
     model = convert("./models/mobilenetv1_prunned/deployment/model.onnx")
