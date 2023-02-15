@@ -17,7 +17,7 @@ def collect_sparse(args):
   target_module_list = [nn.Linear, torch.nn.Conv2d]
   data_root = args.dataset_root
   dataset_paths =  [data_root + '/darkface', data_root + '/coco', data_root + '/exdark', data_root + '/imagenet']
-  fig, axs = plt.subplots(ncols=len(args.model_names), figsize=(13,5))
+  fig, axs = plt.subplots(ncols=len(args.model_names), figsize=(17,4.5))
   colors = ['pink', 'lightblue', 'lightgreen', 'orange']
   models_str = ''
   for k in range(len(args.model_names)):
@@ -142,6 +142,11 @@ def collect_sparse(args):
         cross_layer_random_valid[i] += layer_random_valid
         cross_layer_channel_valid[i] += layer_channel_valid
 
+      # Normalization by mean
+      norm_mean = np.mean([cross_layer_random_valid[i], cross_layer_channel_valid[i]])
+      cross_layer_random_valid[i] = [x/norm_mean for x in cross_layer_random_valid[i]]
+      cross_layer_channel_valid[i] = [x/norm_mean for x in cross_layer_channel_valid[i]]
+
       random_mean = np.mean(cross_layer_random_valid[i])
       random_max = np.max(cross_layer_random_valid[i])
       random_min = np.min(cross_layer_random_valid[i])
@@ -153,6 +158,7 @@ def collect_sparse(args):
       print (i, "th layer with channel mean ", channel_mean,  " with min:", channel_min, " and max:", channel_max)
 
     if (len(args.model_names) > 1): ax = axs[k]
+    else: ax = axs
     ax.hist(cross_layer_random_valid[-1], density=True, color=colors[0], bins=50)  # density=False would make counts
     ax.hist(cross_layer_channel_valid[-1], density=True, color=colors[1], bins=50)  # density=False would make counts
     ax.set_ylabel('Probability', fontsize=16)

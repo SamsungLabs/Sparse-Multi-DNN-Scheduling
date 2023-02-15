@@ -20,7 +20,7 @@ cd ..
 Download sparse model from sparsezoo:
 ```
 pip install sparsezoo
-pip install onnx2torch
+pip install onnx2torch==1.5.6
 mkdir models
 python download_sparse_models.py
 ```
