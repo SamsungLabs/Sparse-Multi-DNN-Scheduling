@@ -1,13 +1,14 @@
-from scheduler import FCFS_Scheduler, Dysta_Scheduler, PREAMA_Scheduler
+from scheduler import FCFS_Scheduler, Dysta_Scheduler, PREMA_Scheduler
 from utils import generate_reqst_table, construct_lat_table
 from options import args
+import random
 import logging
-# logger = logging.getLogger(__name__)
 
+random.seed(args.seed)
 
 scheduler_dict = {"fcfs": FCFS_Scheduler,
                   "dysta": Dysta_Scheduler,
-                  "prema": PREAMA_Scheduler
+                  "prema": PREMA_Scheduler
                   }
 
 def simulation(args):
@@ -20,12 +21,12 @@ def simulation(args):
   for scheduler_name in args.schedule_method:
     scheduler = scheduler_dict[scheduler_name](reqst_table)
     scheduler.set_lat_lut(lat_lut)
-    while (not scheduler.is_finish()):
+    while (not scheduler.is_finished()):
       scheduler.update_reqst()
       scheduler.exe()
 
     # Get violation rate
-    violation_rate, violate_task_list = scheduler.cal_violation_rate()
+    violation_rate, violate_task_list = scheduler.calc_violation_rate()
     print ("Violation rate of ", scheduler_name, " scheduling:", violation_rate)
     print ("+"*100)
     for i in range(len(violate_task_list)):

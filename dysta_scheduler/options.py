@@ -1,6 +1,6 @@
+import sys
 import argparse
 import logging
-import sys
 
 parser = argparse.ArgumentParser(description="Simulator for scheduling sparse multi-DNN workloads on sparse DNN accelerators.")
 
@@ -18,6 +18,10 @@ parser.add_argument("--seq_len", default=512, type=int, required=False,
 
 # Verbosity / Logging
 parser.add_argument("--debug", action="store_true")
+
+# Random seed
+parser.add_argument("--seed", type=int, default=1,
+                    help="Random seed.")
 
 # parser.add_argument("--dataset_root", default="/path/to/your/directory", type=str, help="The path to your dataset root")
 # parser.add_argument("--figs_path", default="/path/to/your/directory", type=str, help="The path to all saved figures/images")
