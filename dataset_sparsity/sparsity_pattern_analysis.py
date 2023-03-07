@@ -16,8 +16,9 @@ def collect_sparse(args):
   img_size = 224
   target_module_list = [nn.Linear, torch.nn.Conv2d]
   data_root = args.dataset_root
+  plt_fontsize = 18
   dataset_paths =  [data_root + '/darkface', data_root + '/coco', data_root + '/exdark', data_root + '/imagenet']
-  fig, axs = plt.subplots(ncols=len(args.model_names), figsize=(17,4.5))
+  fig, axs = plt.subplots(ncols=len(args.model_names), figsize=(17,5.5))
   colors = ['pink', 'lightblue', 'lightgreen', 'orange']
   models_str = ''
   for k in range(len(args.model_names)):
@@ -161,10 +162,11 @@ def collect_sparse(args):
     else: ax = axs
     ax.hist(cross_layer_random_valid[-1], density=True, color=colors[0], bins=50)  # density=False would make counts
     ax.hist(cross_layer_channel_valid[-1], density=True, color=colors[1], bins=50)  # density=False would make counts
-    ax.set_ylabel('Probability', fontsize=16)
-    ax.set_xlabel('Layer_Valid_Ratio_'+model_name, fontsize=16)
+    ax.set_ylabel('Probability', fontsize=plt_fontsize)
+    ax.set_xlabel('Normalized MAC Operation (' + model_name +')', fontsize=plt_fontsize)
+    ax.tick_params(axis='both', labelsize=plt_fontsize-1)
   labels = ['random_sparse', 'channel_sparse']
-  fig.legend(labels, ncol=len(labels), bbox_transform=fig.transFigure, loc='upper center', fontsize=16)
+  fig.legend(labels, ncol=len(labels), bbox_transform=fig.transFigure, loc='upper center', fontsize=plt_fontsize)
   fig.savefig(args.figs_path + models_str + "pattern_sparsity_analysis.pdf")
   plt.close()
 

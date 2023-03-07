@@ -2,3 +2,5 @@
 /dataset_sparsity/data_example
 /dataset_sparsity/ICCV_MAET
 *__pycache__*
+*csv
+*pyc
