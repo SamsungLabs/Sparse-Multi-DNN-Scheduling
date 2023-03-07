@@ -2,7 +2,7 @@
 from utils import *
 
 import logging
-logger = logging.getLogger(__name__)
+# logger = logging.getLogger(__name__)
 
 class Scheduler:
   def __init__(self, reqst_table):
