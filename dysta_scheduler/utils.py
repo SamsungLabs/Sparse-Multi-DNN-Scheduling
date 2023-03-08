@@ -68,7 +68,7 @@ def construct_lat_table(models, csv_lat_files, args):
     e2e_latency = []
     for k, v in batch_latency_dict.items(): # Accumulate all latency in each key
         e2e_latency.append(sum(batch_latency_dict[k]))
-    target_lat = np.mean(e2e_latency)
+    target_lat = args.lat_slo_mult * np.mean(e2e_latency)
 
     # Insert into latency LUT 
     lat_lut[model] = {'lat_lut': batch_latency_dict, 'target_lat': target_lat}

@@ -45,15 +45,17 @@ if __name__ == '__main__':
   # Simulation configuration
   parser.add_argument("--models", nargs='+', default="bert", type=str, choices=["bert", "bart"],
                       help="The name(s) of candidate models.")
+  parser.add_argument("--seq_len", default=512, type=int, required=False,
+                      help="The input sequence length for Transformer models.")
   parser.add_argument("--csv_lat_files", nargs='+', default="bert_lat.csv", type=str,
                       help="The measured latencies of the supplied model(s) on the target accelerator.")
   parser.add_argument("--schedule_method", nargs='+', default="fcfs", type=str, choices=["fcfs", "dysta", "prema"],
                       help="The name(s) of the evaluated scheduling method(s).")
   parser.add_argument("--sample_per_sec", default=30, type=int, 
                       help="The input arrival rate in samples (or tasks) per second.")
-  parser.add_argument("--seq_len", default=512, type=int, required=False,
-                      help="The input sequence length for Transformer models.")
-
+  parser.add_argument("--lat_slo_mult", default=1.0, type=float,
+                      help="Sets the target latency SLO as Mean Isolated Latency x SLO Multiplier (the supplied parameter). Typical values: 1.0 (unattainable), 10 (strict), 100 (loose).")
+  
   # Verbosity / Logging
   parser.add_argument("--debug", action="store_true")
 
