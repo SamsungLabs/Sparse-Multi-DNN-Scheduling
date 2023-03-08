@@ -55,7 +55,10 @@ if __name__ == '__main__':
                       help="The input arrival rate in samples (or tasks) per second.")
   parser.add_argument("--lat_slo_mult", default=1.0, type=float,
                       help="Sets the target latency SLO as Mean Isolated Latency x SLO Multiplier (the supplied parameter). Typical values: 1.0 (unattainable), 10 (strict), 100 (loose).")
+  parser.add_argument("--lat_estimate_mean", action='store_true', default=False,
+                      help="Use the mean per-layer latency as the latency estimate rather than the actual latency due to the variability in sparsity. Currently, it affects both the scheduling decisions and the accelerator remains idle.")
   
+
   # Verbosity / Logging
   parser.add_argument("--debug", action="store_true")
 

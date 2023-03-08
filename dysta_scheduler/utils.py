@@ -2,6 +2,7 @@ import sys
 import random
 import pandas as pd
 import numpy as np
+import copy
 from bench_sanger_v3 import calc_sanger_latency
 
 PRIORITY_LIST = [1, 3, 9] # PREMA's priority scheme
@@ -54,20 +55,36 @@ def construct_lat_table(models, csv_lat_files, args):
     metrics = pd.read_csv(csv_lat_file)
     sparsity = metrics['overall-sparsity']
     num_entries = len(sparsity)
-    num_layer = np.max(metrics['layer-indx'])+1
+    num_layers= np.max(metrics['layer-indx'])+1
     # Get the latency look-up table for each model
     load_balance = metrics['50%-skip']
     batch_latency_dict = {}
     for i in range(num_entries):
       layer_lat = calc_sanger_latency(sparsity[i], load_balance[i], args.seq_len)
       if metrics['batch-indx'][i] not in batch_latency_dict:
-        batch_latency_dict[metrics['batch-indx'][i]] = [ None for i in range(num_layer)]
+        batch_latency_dict[metrics['batch-indx'][i]] = [ None for i in range(num_layers)]
       batch_latency_dict[metrics['batch-indx'][i]][metrics['layer-indx'][i]] = layer_lat
+
+    if args.lat_estimate_mean:
+      # PREMA's latency estimation
+      per_layer_latencies_avg = np.zeros(num_layers)
+      for sample_idx,per_layer_latencies in batch_latency_dict.items():
+        per_layer_latencies_avg = per_layer_latencies_avg + np.asarray(per_layer_latencies)
+      
+      num_samples = len(batch_latency_dict)
+      per_layer_latencies_avg = np.divide(per_layer_latencies_avg, num_samples)
+
+      # Update recorded latency values
+      batch_latency_dict_updated = copy.deepcopy(batch_latency_dict)
+      for sample_idx,per_layer_latencies in batch_latency_dict.items():
+        batch_latency_dict_updated[sample_idx] = per_layer_latencies_avg
+      batch_latency_dict.update(batch_latency_dict_updated)
+    
     # Get the target latency for each model 
     # The current method uses the mean, but can be extended to support others
     e2e_latency = []
     for k, v in batch_latency_dict.items(): # Accumulate all latency in each key
-        e2e_latency.append(sum(batch_latency_dict[k]))
+      e2e_latency.append(sum(batch_latency_dict[k]))
     target_lat = args.lat_slo_mult * np.mean(e2e_latency)
 
     # Insert into latency LUT 
