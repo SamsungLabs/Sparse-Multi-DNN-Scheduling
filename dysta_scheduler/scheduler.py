@@ -105,11 +105,13 @@ class FCFS_Scheduler(Scheduler):
 
   def update_schedule(self):
     next_task_id = None
-    nearst_reqst_time = -1
+
+    # Find the earliest task in the queue
+    earliest_reqst_time = -1
     for task_id,task in self.running_task.items():
-      if ((nearst_reqst_time < 0) or (nearst_reqst_time > task.reqst_time)): 
+      if ((earliest_reqst_time < 0) or (earliest_reqst_time > task.reqst_time)): 
         next_task_id = task_id
-        nearst_reqst_time = task.reqst_time
+        earliest_reqst_time = task.reqst_time
 
     logging.debug("next task:%s, sys time:%f" % (next_task_id, self.sys_time))
     return next_task_id
@@ -134,39 +136,46 @@ class PREMA_Scheduler(Scheduler):
     max_prema_token = 0
     max_task_id = None
     for task_id,task in self.running_task.items():
+      
+      # Initialise tokens with priorities
       if (task.prema_token < 0): 
         task.prema_token = task.priority # Line 3 in PREMA paper, Algorithm 2
         max_task_id = task_id
       else: 
         # Line 7 in PREMA paper, Algorithm 2
         idle_time =  self.sys_time - task.prema_last_exe_time
-        slowdown_rate = idle_time / task.isolated_time
+        slowdown_rate = idle_time / task.isolated_time # TODO - latest idle time or overall waiting time?
         task.prema_token += task.priority * slowdown_rate
         if max_prema_token < task.prema_token:
           max_prema_token = task.prema_token
           max_task_id = task_id
-    # Get threshold based on the max threshould, according to the paragragh under TABLE II in the PREMA paper
+    # Get threshold based on the max threshold, 
+    # according to the paragragh under TABLE II in the PREMA paper
     threshold = -1
-    if (max_prema_token >= 9): threshold = 9
-    elif (max_prema_token >= 3): threshold = 3
-    else: threshold = 1
-    # Get candidate, Line 10 in PREMA paper, Algorithm 2. 
-    candidates = []
+    if (max_prema_token >= 9): 
+      threshold = 9
+    elif (max_prema_token >= 3): 
+      threshold = 3
+    else: 
+      threshold = 1
+    
+    # Get candidate tasks, line 10 in PREMA paper, Algorithm 2
+    candidate_tasks = []
     for task_id,task in self.running_task.items():
       ###################!!!!!!!We change it to "Token >= Threshold", or it does not make sense at the beginning!!!!!!!!!###########
-      if (task.prema_token >= threshold): candidates.append(task_id)
+      if (task.prema_token >= threshold): candidate_tasks.append(task_id)
     
     # Get next token using shortest estimated time approach
     logging.debug("threshold:%d" % (threshold))
-    shorted_time = -1
-    for task_id in candidates:
+    shortest_time = -1
+    for task_id in candidate_tasks:
       estimated_time = sum(self.running_task[task_id].lat_queue)
-      if len(candidates) > 1:
+      if len(candidate_tasks) > 1:
         logging.debug("task in candidate:%s with estimated time:%f" % (task_id, estimated_time))
       #if ((next_task_id is None) or (self.running_task[next_task_id].isolated_time > self.running_task[k].isolated_time)): 
-      if ((next_task_id is None) or (shorted_time > estimated_time)): 
+      if ((next_task_id is None) or (shortest_time > estimated_time)): 
         next_task_id = task_id
-        shorted_time = estimated_time
+        shortest_time = estimated_time
     logging.debug("next task:%s, sys time:%f" % (next_task_id, self.sys_time))
     return next_task_id
     # logging.debug("next task:%s, sys time:%f" % (next_task_id, self.sys_time))
