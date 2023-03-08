@@ -36,6 +36,9 @@ def simulation(args):
 
     system_thrpt = scheduler.calc_system_thrpt()
     print(f"System Throughput (STP): {system_thrpt:.2f} inf/s")
+
+    antt = scheduler.calc_ANTT()
+    print(f"Average Normalised Turnaround Time (ANTT): {antt:.2f}")
     
 if __name__ == '__main__':
   simulation(args)

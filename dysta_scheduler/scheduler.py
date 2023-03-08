@@ -1,5 +1,6 @@
 from utils import Task
 import logging
+import numpy as np
 
 class Scheduler:
   def __init__(self, reqst_table):
@@ -49,6 +50,21 @@ class Scheduler:
     
     assert system_thrpt >= 0
     return system_thrpt
+
+  def calc_ANTT(self):
+    """
+    Returns the average normalised turnaround time (ATNN) 
+    across all inference tasks. This metric captures the average slowdown
+    with respect to the isolated execution of its task on the same hardware.
+    """
+    assert self.is_finished()
+    task_ntts = []
+    for task_id,task_info in self.finished_reqst.items():
+      task_exec_time = task_info.finish_time - task_info.reqst_time
+      task_ntts.append(task_exec_time / task_info.isolated_time)
+
+    antt = np.mean(task_ntts)
+    return antt
 
   def __push_reqst(self, reqst_indx):
     # Read the new input request
