@@ -33,6 +33,9 @@ def simulation(args):
       print ("Violate task:", violate_task_list[i])
     print ("-"*100)
     print ("-"*100)
+
+    system_thrpt = scheduler.calc_system_thrpt()
+    print(f"System Throughput (STP): {system_thrpt:.2f} inf/s")
     
 if __name__ == '__main__':
   simulation(args)

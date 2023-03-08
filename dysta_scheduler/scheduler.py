@@ -33,6 +33,23 @@ class Scheduler:
     assert (violation_rate >= 0) and (violation_rate <= 1)
     return violation_rate, violate_task_list
 
+  def calc_system_thrpt(self):
+    """
+    Returns the system throughput (STP) in inferences per second (inf/s).
+    """
+    assert self.is_finished()
+    last_finish_time = 0
+    for task_id,task_info in self.finished_reqst.items():
+      if last_finish_time <= task_info.finish_time:
+        last_finish_time = task_info.finish_time
+    
+    first_reqst_time, _, _, _ = self.reqst_table[0]
+    exec_time_total = last_finish_time - first_reqst_time
+    system_thrpt = self.num_reqst / exec_time_total
+    
+    assert system_thrpt >= 0
+    return system_thrpt
+
   def __push_reqst(self, reqst_indx):
     # Read the new input request
     reqst_time, target_lat, reqst_model, priority = self.reqst_table[reqst_indx]
