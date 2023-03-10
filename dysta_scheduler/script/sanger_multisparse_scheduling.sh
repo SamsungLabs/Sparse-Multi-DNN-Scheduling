@@ -1,0 +1,2 @@
+# Run on three models
+python simulator.py --schedule_method fcfs prema --models bart bert gpt2 --csv_lat_files ./csv_files/sanger/load_balance_bart_glue_128.csv  ./csv_files/sanger/load_balance_bert_squad_384.csv ./csv_files/sanger/load_balance_gpt2_glue_128.csv

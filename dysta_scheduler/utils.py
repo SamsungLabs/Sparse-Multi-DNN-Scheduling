@@ -4,6 +4,8 @@ import pandas as pd
 import numpy as np
 import copy
 from bench_sanger_v3 import calc_sanger_latency
+import matplotlib.pyplot as plt
+import os
 
 PRIORITY_LIST = [1, 3, 9] # PREMA's priority scheme
 
@@ -31,16 +33,18 @@ def generate_reqst_table(arrival_rate, num_samples, model_list, lat_lut, samplin
       reqst_time += random.expovariate(arrival_rate)
       model_str = model_list[random.randint(0, num_models-1)] # Sample model, uniform sampling
       target_lat = lat_lut[model_str]['target_lat']
+      avg_lat = lat_lut[model_str]['avg_lat'] # Used for PREMA time estimation
       priority = PRIORITY_LIST[random.randint(0, num_priority-1)] # Sample priority, uniform sampling
-      reqst_table.append((reqst_time, target_lat, model_str, priority))
+      reqst_table.append([reqst_time, target_lat, model_str, priority, avg_lat])
   else:
     raise NotImplementedError('Sampling approach not supoorted for request table construction.')
-  # print (reqst_table)
   return reqst_table
+
+
 
 def construct_lat_table(models, csv_lat_files, args):
   """
-  Populates a Look-Up Table (LUT) of latencies for the target accelerator.
+  Construct a Look-Up Table (LUT) of latencies for the target accelerator based on the input csv files contain sparsity info
   
   Args:
     models: The set of models to benchmark.
@@ -65,36 +69,55 @@ def construct_lat_table(models, csv_lat_files, args):
         batch_latency_dict[metrics['batch-indx'][i]] = [ None for i in range(num_layers)]
       batch_latency_dict[metrics['batch-indx'][i]][metrics['layer-indx'][i]] = layer_lat
 
-    if args.lat_estimate_mean:
-      # PREMA's latency estimation
-      per_layer_latencies_avg = np.zeros(num_layers)
-      for sample_idx,per_layer_latencies in batch_latency_dict.items():
-        per_layer_latencies_avg = per_layer_latencies_avg + np.asarray(per_layer_latencies)
+    # Might be wrong
+    ################################################################################
+    # if args.lat_estimate_mean:
+    #   # PREMA's latency estimation
+    #   per_layer_latencies_avg = np.zeros(num_layers)
+    #   for sample_idx,per_layer_latencies in batch_latency_dict.items():
+    #     per_layer_latencies_avg = per_layer_latencies_avg + np.asarray(per_layer_latencies)
       
-      num_samples = len(batch_latency_dict)
-      per_layer_latencies_avg = np.divide(per_layer_latencies_avg, num_samples)
+    #   num_samples = len(batch_latency_dict)
+    #   per_layer_latencies_avg = np.divide(per_layer_latencies_avg, num_samples)
 
-      # Update recorded latency values
-      batch_latency_dict_updated = copy.deepcopy(batch_latency_dict)
-      for sample_idx,per_layer_latencies in batch_latency_dict.items():
-        batch_latency_dict_updated[sample_idx] = per_layer_latencies_avg
-      batch_latency_dict.update(batch_latency_dict_updated)
+    #   # Update recorded latency values
+    #   batch_latency_dict_updated = copy.deepcopy(batch_latency_dict)
+    #   for sample_idx,per_layer_latencies in batch_latency_dict.items():
+    #     batch_latency_dict_updated[sample_idx] = per_layer_latencies_avg
+    #   batch_latency_dict.update(batch_latency_dict_updated)               # Wrong happens here.
+    ################################################################################
+
+    # PREMA's latency estimation
+    per_layer_latencies_avg = np.zeros(num_layers)
+    for sample_idx,per_layer_latencies in batch_latency_dict.items():
+      per_layer_latencies_avg = per_layer_latencies_avg + np.asarray(per_layer_latencies)
     
+    num_samples = len(batch_latency_dict)
+    per_layer_latencies_avg = np.divide(per_layer_latencies_avg, num_samples)
+
     # Get the target latency for each model 
     # The current method uses the mean, but can be extended to support others
     e2e_latency = []
     for k, v in batch_latency_dict.items(): # Accumulate all latency in each key
       e2e_latency.append(sum(batch_latency_dict[k]))
-    target_lat = args.lat_slo_mult * np.mean(e2e_latency)
+    
+    # Draw the latency distribution 
+    if (args.draw_dist):
+      plt.hist(e2e_latency, density=True, bins=100)  # density=False would make counts
+      plt.ylabel('Probability')
+      plt.xlabel('Data')
+      plt.savefig(os.path.join(args.figs_path, model+"_lat_dist.pdf"))
+      plt.close()
+
+    target_lat = np.mean(e2e_latency)
 
     # Insert into latency LUT 
-    lat_lut[model] = {'lat_lut': batch_latency_dict, 'target_lat': target_lat}
+    lat_lut[model] = {'lat_lut': batch_latency_dict, 'target_lat': target_lat, 'avg_lat': per_layer_latencies_avg}
   return lat_lut
 
 class Task:
   """
-  Represents an inference task, consisting of a model, 
-  a request arrival time, a target latency and a priority.
+  Represents an inference task, consisting of a model.
 
   Args:
     reqst_time: Arrival time of the request.
@@ -102,7 +125,7 @@ class Task:
     model_str: Target model.
     priority: Assigned priority level.
   """
-  def __init__(self, reqst_time, target_lat, model_str, priority):
+  def __init__(self, reqst_time, target_lat, model_str, priority, avg_lat):
     self.reqst_time = reqst_time
     self.target_time = self.reqst_time + target_lat # target end time
     self.isolated_time = target_lat # TODO
@@ -113,6 +136,7 @@ class Task:
     self.urgency = -1
     self.prema_last_exe_time = self.reqst_time # For PREMA use
     self.prema_token = -1 # For PREMA use
+    self.avg_lat_queue = list(avg_lat) # For PREMA use
 
   def sample_data(self, num_examples):
     """
@@ -135,6 +159,7 @@ class Task:
     Executes the current layer.
     """
     lat = self.lat_queue.pop(0)
+    self.avg_lat_queue.pop(0)
     return lat
 
   def is_finished(self, sys_time):

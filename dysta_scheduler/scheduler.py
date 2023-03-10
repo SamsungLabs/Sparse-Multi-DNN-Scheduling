@@ -44,7 +44,7 @@ class Scheduler:
       if last_finish_time <= task_info.finish_time:
         last_finish_time = task_info.finish_time
     
-    first_reqst_time, _, _, _ = self.reqst_table[0]
+    first_reqst_time, _, _, _, _ = self.reqst_table[0]
     exec_time_total = last_finish_time - first_reqst_time
     system_thrpt = self.num_reqst / exec_time_total
     
@@ -68,10 +68,10 @@ class Scheduler:
 
   def __push_reqst(self, reqst_indx):
     # Read the new input request
-    reqst_time, target_lat, reqst_model, priority = self.reqst_table[reqst_indx]
+    reqst_time, target_lat, reqst_model, priority, avg_lat = self.reqst_table[reqst_indx]
     
     # Construct a new task
-    new_task = Task(reqst_time, target_lat, reqst_model, priority)
+    new_task = Task(reqst_time, target_lat, reqst_model, priority, avg_lat)
 
     # Get the amount of data in the target dataset
     num_examples = len(self.lat_lut[reqst_model])
@@ -89,7 +89,7 @@ class Scheduler:
   def update_reqst(self):
     if (self.cur_reqst_indx < self.num_reqst): 
       # request info: req_time, target_lat, model, priority
-      reqst_time, target_lat, reqst_model, priority = self.reqst_table[self.cur_reqst_indx]
+      reqst_time, target_lat, reqst_model, priority, avg_lat = self.reqst_table[self.cur_reqst_indx]
       
       # No running task, push the nearest request
       if (len(self.running_task) == 0): 
@@ -105,7 +105,7 @@ class Scheduler:
           # Update request info
           self.cur_reqst_indx += 1
           if (self.cur_reqst_indx >= self.num_reqst): break
-          reqst_time, target_lat, reqst_model, priority = self.reqst_table[self.cur_reqst_indx]
+          reqst_time, target_lat, reqst_model, priority, avg_lat = self.reqst_table[self.cur_reqst_indx]
     else:
       pass
   
@@ -202,7 +202,8 @@ class PREMA_Scheduler(Scheduler):
     logging.debug("threshold:%d" % (threshold))
     shortest_time = -1
     for task_id in candidate_tasks:
-      estimated_time = sum(self.running_task[task_id].lat_queue)
+      estimated_time = sum(self.running_task[task_id].avg_lat_queue) # Use estimate avg (PREAMA) lat 
+      # estimated_time = sum(self.running_task[task_id].lat_queue) # Use real lat 
       if len(candidate_tasks) > 1:
         logging.debug("task in candidate:%s with estimated time:%f" % (task_id, estimated_time))
       #if ((next_task_id is None) or (self.running_task[next_task_id].isolated_time > self.running_task[k].isolated_time)): 
