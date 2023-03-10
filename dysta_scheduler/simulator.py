@@ -16,6 +16,7 @@ RED = "#E3120B"
 
 scheduler_dict = {"fcfs": FCFS_Scheduler,
                   "dysta": Dysta_Scheduler,
+                  "prema_sparse": PREMA_Scheduler,
                   "prema": PREMA_Scheduler
                   }
 
@@ -43,7 +44,8 @@ def simulation(args):
       logging.debug("The target lat:%f" % (reqst[1]))
     # Handle request using different schedulers 
     for scheduler_name in args.schedule_method:
-      scheduler = scheduler_dict[scheduler_name](reqst_table)
+      if str.endswith(scheduler_name, "sparse"): scheduler = scheduler_dict[scheduler_name](reqst_table, is_sparse=True)
+      else: scheduler = scheduler_dict[scheduler_name](reqst_table)
       scheduler.set_lat_lut(lat_lut)
       while (not scheduler.is_finished()):
         scheduler.update_reqst()
@@ -102,7 +104,7 @@ if __name__ == '__main__':
                       help="The input sequence length for Transformer models.")
   parser.add_argument("--csv_lat_files", nargs='+', default="bert_lat.csv", type=str,
                       help="The measured latencies of the supplied model(s) on the target accelerator.")
-  parser.add_argument("--schedule_method", nargs='+', default="fcfs", type=str, choices=["fcfs", "dysta", "prema"],
+  parser.add_argument("--schedule_method", nargs='+', default="fcfs", type=str, choices=["fcfs", "dysta", "prema_sparse", "prema"],
                       help="The name(s) of the evaluated scheduling method(s).")
   parser.add_argument("--sample_per_sec", default=30, type=int, 
                       help="The input arrival rate in samples (or tasks) per second.")

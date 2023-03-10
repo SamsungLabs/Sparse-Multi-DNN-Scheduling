@@ -148,6 +148,7 @@ class Task:
     self.prema_last_exe_time = self.reqst_time # For PREMA use
     self.prema_token = -1 # For PREMA use
     self.avg_lat_queue = list(avg_lat) # For PREMA use
+    self.sum_lat = -1 # For Ddysta
 
   def construct_task(self, lat_table):
     """
@@ -155,6 +156,8 @@ class Task:
     """
     for i in range(len(lat_table)):
       self.lat_queue.append(lat_table[i])
+    
+    self.sum_lat = sum(self.lat_queue)
 
   def exe(self):
     """
