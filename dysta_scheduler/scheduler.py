@@ -43,8 +43,7 @@ class Scheduler:
     for task_id,task_info in self.finished_reqst.items():
       if last_finish_time <= task_info.finish_time:
         last_finish_time = task_info.finish_time
-    
-    first_reqst_time, _, _, _, _ = self.reqst_table[0]
+    first_reqst_time, _, _, _, _, _ = self.reqst_table[0]
     exec_time_total = last_finish_time - first_reqst_time
     system_thrpt = self.num_reqst / exec_time_total
     
@@ -68,16 +67,12 @@ class Scheduler:
 
   def __push_reqst(self, reqst_indx):
     # Read the new input request
-    reqst_time, target_lat, reqst_model, priority, avg_lat = self.reqst_table[reqst_indx]
+    reqst_time, target_lat, reqst_model, priority, avg_lat, sample_id = self.reqst_table[reqst_indx]
     
     # Construct a new task
     new_task = Task(reqst_time, target_lat, reqst_model, priority, avg_lat)
 
-    # Get the amount of data in the target dataset
-    num_examples = len(self.lat_lut[reqst_model])
 
-    # Sample from the dataset to emulate random sparsity
-    sample_id = new_task.sample_data(num_examples)
     new_task.construct_task(self.lat_lut[reqst_model]['lat_lut'][sample_id])
     task_id = str(reqst_time) + "_" + reqst_model # log using arrival time and model name
     
@@ -89,7 +84,7 @@ class Scheduler:
   def update_reqst(self):
     if (self.cur_reqst_indx < self.num_reqst): 
       # request info: req_time, target_lat, model, priority
-      reqst_time, target_lat, reqst_model, priority, avg_lat = self.reqst_table[self.cur_reqst_indx]
+      reqst_time, target_lat, reqst_model, priority, avg_lat, sample_id = self.reqst_table[self.cur_reqst_indx]
       
       # No running task, push the nearest request
       if (len(self.running_task) == 0): 
@@ -105,7 +100,7 @@ class Scheduler:
           # Update request info
           self.cur_reqst_indx += 1
           if (self.cur_reqst_indx >= self.num_reqst): break
-          reqst_time, target_lat, reqst_model, priority, avg_lat = self.reqst_table[self.cur_reqst_indx]
+          reqst_time, target_lat, reqst_model, priority, avg_lat, sample_id = self.reqst_table[self.cur_reqst_indx]
     else:
       pass
   
@@ -118,7 +113,6 @@ class Scheduler:
     lat_consumed = self.running_task[task_id].exe() # latency of the executed layer
     self.sys_time += lat_consumed
     self.running_task[task_id].prema_last_exe_time = self.sys_time
-    
     # Check any finished task
     if (self.running_task[task_id].is_finished(self.sys_time)):
       self.finished_reqst[task_id] = self.running_task[task_id]
@@ -157,6 +151,7 @@ class PREMA_Scheduler(Scheduler):
   """
   def __init__(self,reqst_table):
     super().__init__(reqst_table)
+    print ("Constructing PREMA Scheduler.")
     self.ready_queue = {}
 
   def reset(self, reqst_table):
@@ -227,21 +222,74 @@ class Dysta_Scheduler(Scheduler):
 
   def update_schedule(self):
     next_task_id = None
-    highest_urgency = -1
+
+    # Update token score
+    max_prema_token = 0
+    max_task_id = None
     for task_id,task in self.running_task.items():
-      remain_lat =  task.target_time - self.sys_time
-      torun_lat = sum(task.lat_queue)
-      task.urgency = torun_lat/remain_lat
-      task.urgency = 1 if task.urgency > 1 else task.urgency
-      print ("cur urgency:", task.urgency, " and highest urgency:", highest_urgency)
-      if ((highest_urgency < 0) or (highest_urgency <= task.urgency)): 
-        if ((highest_urgency == task.urgency) and (self.running_task[next_task_id].reqst_time < task.reqst_time)):
-          # If with the same, use FCFS
-          continue
-        else:
-          next_task_id = task_id
-          highest_urgency = task.urgency
+      
+      # Initialise tokens with priorities
+      if (task.prema_token < 0): 
+        task.prema_token = task.priority # Line 3 in PREMA paper, Algorithm 2
+        max_task_id = task_id
+      else: 
+        # Line 7 in PREMA paper, Algorithm 2
+        idle_time =  self.sys_time - task.prema_last_exe_time
+        slowdown_rate = idle_time / task.isolated_time # TODO - latest idle time or overall waiting time?
+        task.prema_token += task.priority * slowdown_rate
+        if max_prema_token < task.prema_token:
+          max_prema_token = task.prema_token
+          max_task_id = task_id
+    # Get threshold based on the max threshold, 
+    # according to the paragragh under TABLE II in the PREMA paper
+    threshold = -1
+    if (max_prema_token >= 9): 
+      threshold = 9
+    elif (max_prema_token >= 3): 
+      threshold = 3
+    else: 
+      threshold = 1
+    
+    # Get candidate tasks, line 10 in PREMA paper, Algorithm 2
+    candidate_tasks = []
+    for task_id,task in self.running_task.items():
+      ###################!!!!!!!We change it to "Token >= Threshold", or it does not make sense at the beginning!!!!!!!!!###########
+      if (task.prema_token >= threshold): candidate_tasks.append(task_id)
+    
+    # Get next token using shortest estimated time approach
+    logging.debug("threshold:%d" % (threshold))
+    shortest_time = -1
+    for task_id in candidate_tasks:
+      estimated_time = sum(self.running_task[task_id].lat_queue) # Use real lat 
+      if len(candidate_tasks) > 1:
+        logging.debug("task in candidate:%s with estimated time:%f" % (task_id, estimated_time))
+      #if ((next_task_id is None) or (self.running_task[next_task_id].isolated_time > self.running_task[k].isolated_time)): 
+      if ((next_task_id is None) or (shortest_time > estimated_time)): 
+        next_task_id = task_id
+        shortest_time = estimated_time
     logging.debug("next task:%s, sys time:%f" % (next_task_id, self.sys_time))
     return next_task_id
+    # logging.debug("next task:%s, sys time:%f" % (next_task_id, self.sys_time))
+
+
+  # Commented out, Old implementation
+
+  # def update_schedule(self):
+  #   next_task_id = None
+  #   highest_urgency = -1
+  #   for task_id,task in self.running_task.items():
+  #     remain_lat =  task.target_time - self.sys_time
+  #     torun_lat = sum(task.lat_queue)
+  #     task.urgency = torun_lat/remain_lat
+  #     task.urgency = 1 if task.urgency > 1 else task.urgency
+  #     if ((highest_urgency < 0) or (highest_urgency <= task.urgency)): 
+  #       if ((highest_urgency == task.urgency) and (self.running_task[next_task_id].reqst_time < task.reqst_time)):
+  #         # If with the same, use FCFS
+  #         continue
+  #       else:
+  #         next_task_id = task_id
+  #         highest_urgency = task.urgency
+  #   logging.debug("next task:%s, sys time:%f" % (next_task_id, self.sys_time))
+  #   return next_task_id
 
 

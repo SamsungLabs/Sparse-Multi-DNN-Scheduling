@@ -35,7 +35,9 @@ def generate_reqst_table(arrival_rate, num_samples, model_list, lat_lut, samplin
       target_lat = lat_lut[model_str]['target_lat']
       avg_lat = lat_lut[model_str]['avg_lat'] # Used for PREMA time estimation
       priority = PRIORITY_LIST[random.randint(0, num_priority-1)] # Sample priority, uniform sampling
-      reqst_table.append([reqst_time, target_lat, model_str, priority, avg_lat])
+      num_examples = len(lat_lut[model_str])# Get the amount of data in the target dataset
+      sample_id = sample_data(num_examples) # Sample from the dataset 
+      reqst_table.append([reqst_time, target_lat, model_str, priority, avg_lat, sample_id])
   else:
     raise NotImplementedError('Sampling approach not supoorted for request table construction.')
   return reqst_table
@@ -115,6 +117,15 @@ def construct_lat_table(models, csv_lat_files, args):
     lat_lut[model] = {'lat_lut': batch_latency_dict, 'target_lat': target_lat, 'avg_lat': per_layer_latencies_avg}
   return lat_lut
 
+def sample_data(num_examples):
+  """
+    Samples a random input from the target dataset. 
+    This is to emulate random levels of sparsity.
+    It currently uses uniform sampling, but it can be extended.
+  """
+  sample_id = random.randint(0, num_examples-1)
+  return sample_id
+
 class Task:
   """
   Represents an inference task, consisting of a model.
@@ -137,15 +148,6 @@ class Task:
     self.prema_last_exe_time = self.reqst_time # For PREMA use
     self.prema_token = -1 # For PREMA use
     self.avg_lat_queue = list(avg_lat) # For PREMA use
-
-  def sample_data(self, num_examples):
-    """
-      Samples a random input from the target dataset. 
-      This is to emulate random levels of sparsity.
-      It currently uses uniform sampling, but it can be extended.
-    """
-    sample_id = random.randint(0, num_examples-1)
-    return sample_id
 
   def construct_task(self, lat_table):
     """

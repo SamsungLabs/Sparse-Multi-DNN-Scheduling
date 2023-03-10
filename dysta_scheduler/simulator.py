@@ -30,6 +30,11 @@ def simulation(args):
             "antt":{}}
   # Evaluate each scheduler
   for lat_slo_mult in args.lat_slo_mult:
+    # if (lat_slo_mult == 3):
+    #   print ("enable debug mode")
+    #   logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+    # else:
+    #   logging.basicConfig(stream=sys.stdout, level=logging.INFO)
     reqst_table = reqst_table_base.copy()
     # Update target target_lat using lat_slo_mult
     logging.info("*************** Creating new reqst tables using lat_slo_mult:%f ***************", lat_slo_mult)
@@ -130,9 +135,9 @@ if __name__ == '__main__':
 
   # Logging setup
   if args.debug:
-      logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+    logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
   else:
-      logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+    logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
   random.seed(args.seed)
 
