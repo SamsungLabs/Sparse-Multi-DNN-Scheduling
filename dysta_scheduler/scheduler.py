@@ -60,7 +60,7 @@ class Scheduler:
     task_ntts = []
     for task_id,task_info in self.finished_reqst.items():
       task_exec_time = task_info.finish_time - task_info.reqst_time
-      task_ntts.append(task_exec_time / task_info.isolated_time)
+      task_ntts.append(task_exec_time / task_info.real_isolated_time)
 
     antt = np.mean(task_ntts)
     return antt
@@ -151,7 +151,10 @@ class PREMA_Scheduler(Scheduler):
   """
   def __init__(self,reqst_table, is_sparse=False):
     super().__init__(reqst_table)
-    print ("Constructing PREMA Scheduler.")
+    if is_sparse:
+      print ("Constructing Sparse PREMA Scheduler.")
+    else:
+      print ("Constructing PREMA Scheduler.")
     self.ready_queue = {}
     self.is_sparse = is_sparse
 
@@ -173,14 +176,10 @@ class PREMA_Scheduler(Scheduler):
       else: 
         # Line 7 in PREMA paper, Algorithm 2
         idle_time =  self.sys_time - task.prema_last_exe_time
-        # if self.is_sparse:
-        #   slowdown_rate = idle_time / task.sum_lat
-        # else:
         if self.is_sparse:
-          slowdown_rate = idle_time / task.isolated_time # TODO - latest idle time or overall waiting time?
+          slowdown_rate = idle_time / task.real_isolated_time # TODO - latest idle time or overall waiting time?
         else:
-          estimated_isolated_time = task.sum_avg_lat
-          slowdown_rate = idle_time / estimated_isolated_time
+          slowdown_rate = idle_time / task.prema_est_isolated_time
         task.prema_token += task.priority * slowdown_rate
         if max_prema_token < task.prema_token:
           max_prema_token = task.prema_token
@@ -206,12 +205,11 @@ class PREMA_Scheduler(Scheduler):
     shortest_time = -1
     for task_id in candidate_tasks:
       if self.is_sparse:
-        estimated_time = sum(self.running_task[task_id].lat_queue) # Use real sparsity to estimate lat
+        estimated_time = sum(self.running_task[task_id].real_lat_queue) # Use real sparsity to estimate lat
       else:
-        estimated_time = sum(self.running_task[task_id].avg_lat_queue) # Use estimate avg (PREAMA) lat  
+        estimated_time = sum(self.running_task[task_id].prema_est_lat_queue) # Use estimate avg (PREAMA) lat  
       if len(candidate_tasks) > 1:
         logging.debug("task in candidate:%s with estimated time:%f" % (task_id, estimated_time))
-      #if ((next_task_id is None) or (self.running_task[next_task_id].isolated_time > self.running_task[k].isolated_time)): 
       if ((next_task_id is None) or (shortest_time > estimated_time)): 
         next_task_id = task_id
         shortest_time = estimated_time
@@ -235,7 +233,7 @@ class Dysta_Scheduler(Scheduler):
     highest_urgency = -1
     for task_id,task in self.running_task.items():
       remain_lat =  task.target_time - self.sys_time
-      torun_lat = sum(task.lat_queue)
+      torun_lat = sum(task.real_lat_queue)
       task.urgency = torun_lat/remain_lat
       task.urgency = 1 if task.urgency > 1 else task.urgency
       if ((highest_urgency < 0) or (highest_urgency <= task.urgency)): 

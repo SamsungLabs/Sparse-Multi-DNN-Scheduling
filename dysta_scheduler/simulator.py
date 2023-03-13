@@ -24,7 +24,7 @@ def simulation(args):
   # Construct latency Look-Up Table (LUT)
   #   {"model_str": {"lat_lut": {{batch_no: [lat_layer1, lat_layer2, ...], batch_no: [lat_layer1, lat_layer2, ...]}}, "mean_lat": float}, ....}
   lat_lut = construct_lat_table(args.models, args.csv_lat_files, args)
-  reqst_table_base = generate_reqst_table(args.sample_per_sec, args.sample_per_sec, args.models, lat_lut)
+  reqst_table_base = generate_reqst_table(args.sample_per_sec, args.num_sample, args.models, lat_lut)
  
   metrics = {"vio_rate":{},
             "thrpt":{},
@@ -44,6 +44,7 @@ def simulation(args):
       logging.debug("The target lat:%f" % (reqst[1]))
     # Handle request using different schedulers 
     for scheduler_name in args.schedule_method:
+      print ("-"*100)
       if str.endswith(scheduler_name, "sparse"): scheduler = scheduler_dict[scheduler_name](reqst_table, is_sparse=True)
       else: scheduler = scheduler_dict[scheduler_name](reqst_table)
       scheduler.set_lat_lut(lat_lut)
@@ -57,11 +58,8 @@ def simulation(args):
       else: metrics["vio_rate"][scheduler_name].append(violation_rate)
 
       print ("Violation rate of ", scheduler_name, " scheduling:", violation_rate)
-      print ("+"*100)
       for i in range(len(violate_task_list)):
         print ("Violate task:", violate_task_list[i])
-      print ("-"*100)
-      print ("-"*100)
 
       system_thrpt = scheduler.calc_system_thrpt()
       print(f"System Throughput (STP): {system_thrpt:.2f} inf/s")
@@ -72,7 +70,7 @@ def simulation(args):
       print(f"Average Normalised Turnaround Time (ANTT): {antt:.2f}")
       if scheduler_name not in metrics["antt"]: metrics["antt"][scheduler_name] = [antt]
       else: metrics["antt"][scheduler_name].append(antt)
-  
+      print ("-"*100)
   # Drawing figs using obtained metrics
   fig, axs = plt.subplots(nrows=1, ncols=3, figsize=(18, 2.0))
   COLORS = [BLUE, GREEN, BROWN_DARKER, GREY, RED]
@@ -108,6 +106,8 @@ if __name__ == '__main__':
                       help="The name(s) of the evaluated scheduling method(s).")
   parser.add_argument("--sample_per_sec", default=30, type=int, 
                       help="The input arrival rate in samples (or tasks) per second.")
+  parser.add_argument("--num_sample", default=200, type=int, 
+                      help="The total number of samples to simulate.")
   parser.add_argument("--lat_slo_mult", nargs='+', default=1.0, type=float,
                       help="Sets the target latency SLO as Mean Isolated Latency x SLO Multiplier (the supplied parameter). Typical values: 1.0 (unattainable), 10 (strict), 100 (loose).")
   # parser.add_argument("--lat_estimate_mean", action='store_true', default=False,

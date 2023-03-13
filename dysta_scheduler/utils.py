@@ -139,35 +139,33 @@ class Task:
   def __init__(self, reqst_time, target_lat, model_str, priority, avg_lat):
     self.reqst_time = reqst_time
     self.target_time = self.reqst_time + target_lat # target end time
-    self.isolated_time = -1 # initalize as -1, updated in construct_task()
+    self.real_isolated_time = -1 # isolated time using real sparsity, initalize as -1, updated in construct_task()
+    self.est_isolated_time = -1 # isolated time without knowing real sparsity, initalize as -1, updated in construct_task()
     self.finish_time = -1 # initialize as -1
     self.model_str = model_str
-    self.lat_queue = []
+    self.real_lat_queue = []
     self.priority = priority # initialize as -1
     self.urgency = -1
     self.prema_last_exe_time = self.reqst_time # For PREMA use
     self.prema_token = -1 # For PREMA use
-    self.avg_lat_queue = list(avg_lat) # For PREMA use
-    self.sum_lat = -1 # For Ddysta
-    self.sum_avg_lat = -1 # for PREMA use
+    self.prema_est_lat_queue = list(avg_lat) # For PREMA use, PREMA use average latency as estimated latency queue
 
   def construct_task(self, lat_table):
     """ 
     Adds all layers of the model to the task's queue.
     """
     for i in range(len(lat_table)):
-      self.lat_queue.append(lat_table[i])
+      self.real_lat_queue.append(lat_table[i])
     
-    self.sum_lat = sum(self.lat_queue)
-    self.isolated_time = self.sum_lat
-    self.sum_avg_lat = sum(self.avg_lat_queue)
+    self.real_isolated_time = sum(self.real_lat_queue)
+    self.prema_est_isolated_time = sum(self.prema_est_lat_queue)
 
   def exe(self):
     """
     Executes the current layer.
     """
-    lat = self.lat_queue.pop(0)
-    self.avg_lat_queue.pop(0)
+    lat = self.real_lat_queue.pop(0)
+    self.prema_est_lat_queue.pop(0)
     return lat
 
   def is_finished(self, sys_time):
@@ -175,7 +173,7 @@ class Task:
     Checkes whether all layers of the model 
     have been executed.
     """
-    if (len(self.lat_queue) == 0):
+    if (len(self.real_lat_queue) == 0):
       self.finish_time = sys_time
       return True
     else:
