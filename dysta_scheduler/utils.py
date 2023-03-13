@@ -139,7 +139,7 @@ class Task:
   def __init__(self, reqst_time, target_lat, model_str, priority, avg_lat):
     self.reqst_time = reqst_time
     self.target_time = self.reqst_time + target_lat # target end time
-    self.isolated_time = target_lat # TODO
+    self.isolated_time = -1 # initalize as -1, updated in construct_task()
     self.finish_time = -1 # initialize as -1
     self.model_str = model_str
     self.lat_queue = []
@@ -149,15 +149,18 @@ class Task:
     self.prema_token = -1 # For PREMA use
     self.avg_lat_queue = list(avg_lat) # For PREMA use
     self.sum_lat = -1 # For Ddysta
+    self.sum_avg_lat = -1 # for PREMA use
 
   def construct_task(self, lat_table):
-    """
+    """ 
     Adds all layers of the model to the task's queue.
     """
     for i in range(len(lat_table)):
       self.lat_queue.append(lat_table[i])
     
     self.sum_lat = sum(self.lat_queue)
+    self.isolated_time = self.sum_lat
+    self.sum_avg_lat = sum(self.avg_lat_queue)
 
   def exe(self):
     """
