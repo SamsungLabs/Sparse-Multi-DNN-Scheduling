@@ -139,7 +139,7 @@ class Task:
   def __init__(self, reqst_time, target_lat, model_str, priority, avg_lat):
     self.reqst_time = reqst_time
     self.target_time = self.reqst_time + target_lat # target end time
-    self.isolated_time = target_lat # TODO
+    self.isolated_time = -1 # initalize as -1, updated in construct_task()
     self.finish_time = -1 # initialize as -1
     self.model_str = model_str
     self.lat_queue = []
@@ -158,6 +158,7 @@ class Task:
       self.lat_queue.append(lat_table[i])
     
     self.sum_lat = sum(self.lat_queue)
+    self.isolated_time = self.sum_lat
 
   def exe(self):
     """
