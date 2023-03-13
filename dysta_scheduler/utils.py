@@ -145,7 +145,8 @@ class Task:
     self.model_str = model_str
     self.real_lat_queue = []
     self.priority = priority # initialize as -1
-    self.urgency = -1
+    self.urgency = -1 # For SDRM use
+    self.map_score = -1 # For SDRM use
     self.prema_last_exe_time = self.reqst_time # For PREMA use
     self.prema_token = -1 # For PREMA use
     self.prema_est_lat_queue = list(avg_lat) # For PREMA use, PREMA use average latency as estimated latency queue

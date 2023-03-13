@@ -207,7 +207,7 @@ class PREMA_Scheduler(Scheduler):
       if self.is_sparse:
         estimated_time = sum(self.running_task[task_id].real_lat_queue) # Use real sparsity to estimate lat
       else:
-        estimated_time = sum(self.running_task[task_id].prema_est_lat_queue) # Use estimate avg (PREAMA) lat  
+        estimated_time = sum(self.running_task[task_id].prema_est_lat_queue) # Use estimate avg (PREMA) lat  
       if len(candidate_tasks) > 1:
         logging.debug("task in candidate:%s with estimated time:%f" % (task_id, estimated_time))
       if ((next_task_id is None) or (shortest_time > estimated_time)): 
@@ -225,17 +225,22 @@ class Dysta_Scheduler(Scheduler):
   def __init__(self,reqst_table):
     super().__init__(reqst_table)
     print ("Constructing Dysta Scheduler.")
+
   def reset(self, reqst_table):
     self.__init__(reqst_table)
 
   def update_schedule(self):
     next_task_id = None
     highest_urgency = -1
+    max_map_score = -1
     for task_id,task in self.running_task.items():
+      
+      # Calculate urgency
       remain_lat =  task.target_time - self.sys_time
       torun_lat = sum(task.real_lat_queue)
       task.urgency = torun_lat/remain_lat
       task.urgency = 1 if task.urgency > 1 else task.urgency
+      
       if ((highest_urgency < 0) or (highest_urgency <= task.urgency)): 
         if ((highest_urgency == task.urgency) and (self.running_task[next_task_id].reqst_time < task.reqst_time)):
           # If with the same, use FCFS
@@ -247,3 +252,46 @@ class Dysta_Scheduler(Scheduler):
     return next_task_id
 
 
+class SDRM3_Scheduler(Scheduler):
+  """
+  This scheduler implements SDRM3 (arXiv 2022).
+  """
+  def __init__(self,reqst_table, alpha=1.0):
+    super().__init__(reqst_table)
+    self.alpha = alpha
+    print ("Constructing SDRM3 Scheduler.")
+
+  def reset(self, reqst_table):
+    self.__init__(reqst_table)
+
+  def update_schedule(self):
+    next_task_id = None
+    highest_urgency = -1
+    max_map_score = -1
+    for task_id,task in self.running_task.items():
+      
+      # Calculate urgency
+      remain_lat =  task.target_time - self.sys_time
+      torun_lat = sum(task.prema_est_lat_queue)
+      task.urgency = torun_lat/remain_lat
+      task.urgency = 1 if task.urgency > 1 else task.urgency
+
+      # Calculate fairness
+      idle_time =  self.sys_time - task.prema_last_exe_time
+      task.fairness = idle_time / task.prema_est_lat_queue[0]
+
+      # Calculate MapScore
+      task.map_score = task.urgency + self.alpha * task.fairness
+
+      # if ((highest_urgency < 0) or (highest_urgency <= task.urgency)): 
+      if ((max_map_score < 0) or (max_map_score <= task.map_score)):
+        # if ((highest_urgency == task.urgency) and (self.running_task[next_task_id].reqst_time < task.reqst_time)):
+        if ((max_map_score == task.map_score) and (self.running_task[next_task_id].reqst_time < task.reqst_time)):
+          # If with the same, use FCFS
+          continue
+        else:
+          next_task_id = task_id
+          highest_urgency = task.urgency
+          max_map_score = task.map_score
+    logging.debug("next task:%s, sys time:%f" % (next_task_id, self.sys_time))
+    return next_task_id

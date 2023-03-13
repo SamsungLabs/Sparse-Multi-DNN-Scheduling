@@ -1,4 +1,4 @@
-from scheduler import FCFS_Scheduler, Dysta_Scheduler, PREMA_Scheduler
+from scheduler import FCFS_Scheduler, Dysta_Scheduler, PREMA_Scheduler, SDRM3_Scheduler
 from utils import generate_reqst_table, construct_lat_table
 import sys
 import argparse
@@ -17,7 +17,8 @@ RED = "#E3120B"
 scheduler_dict = {"fcfs": FCFS_Scheduler,
                   "dysta": Dysta_Scheduler,
                   "prema_sparse": PREMA_Scheduler,
-                  "prema": PREMA_Scheduler
+                  "prema": PREMA_Scheduler,
+                  "sdrm3": SDRM3_Scheduler,
                   }
 
 def simulation(args):
@@ -46,6 +47,7 @@ def simulation(args):
     for scheduler_name in args.schedule_method:
       print ("-"*100)
       if str.endswith(scheduler_name, "sparse"): scheduler = scheduler_dict[scheduler_name](reqst_table, is_sparse=True)
+      elif 'sdrm3' in scheduler_name: scheduler = scheduler_dict[scheduler_name](reqst_table, alpha=args.alpha)
       else: scheduler = scheduler_dict[scheduler_name](reqst_table)
       scheduler.set_lat_lut(lat_lut)
       while (not scheduler.is_finished()):
@@ -102,8 +104,10 @@ if __name__ == '__main__':
                       help="The input sequence length for Transformer models.")
   parser.add_argument("--csv_lat_files", nargs='+', default="bert_lat.csv", type=str,
                       help="The measured latencies of the supplied model(s) on the target accelerator.")
-  parser.add_argument("--schedule_method", nargs='+', default="fcfs", type=str, choices=["fcfs", "dysta", "prema_sparse", "prema"],
+  parser.add_argument("--schedule_method", nargs='+', default="fcfs", type=str, choices=["fcfs", "dysta", "prema_sparse", "prema", "sdrm3"],
                       help="The name(s) of the evaluated scheduling method(s).")
+  parser.add_argument("--alpha", default=0.0, type=float, 
+                      help="The fairness weight for SDRM3's MapScore metric.")
   parser.add_argument("--sample_per_sec", default=30, type=int, 
                       help="The input arrival rate in samples (or tasks) per second.")
   parser.add_argument("--num_sample", default=200, type=int, 
