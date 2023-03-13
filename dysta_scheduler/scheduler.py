@@ -176,7 +176,11 @@ class PREMA_Scheduler(Scheduler):
         # if self.is_sparse:
         #   slowdown_rate = idle_time / task.sum_lat
         # else:
-        slowdown_rate = idle_time / task.isolated_time # TODO - latest idle time or overall waiting time?
+        if self.is_sparse:
+          slowdown_rate = idle_time / task.isolated_time # TODO - latest idle time or overall waiting time?
+        else:
+          estimated_isolated_time = task.sum_avg_lat
+          slowdown_rate = idle_time / estimated_isolated_time
         task.prema_token += task.priority * slowdown_rate
         if max_prema_token < task.prema_token:
           max_prema_token = task.prema_token
