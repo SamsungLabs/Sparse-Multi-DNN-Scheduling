@@ -149,9 +149,10 @@ class Task:
     self.prema_token = -1 # For PREMA use
     self.avg_lat_queue = list(avg_lat) # For PREMA use
     self.sum_lat = -1 # For Ddysta
+    self.sum_avg_lat = -1 # for PREMA use
 
   def construct_task(self, lat_table):
-    """
+    """ 
     Adds all layers of the model to the task's queue.
     """
     for i in range(len(lat_table)):
@@ -159,6 +160,7 @@ class Task:
     
     self.sum_lat = sum(self.lat_queue)
     self.isolated_time = self.sum_lat
+    self.sum_avg_lat = sum(self.avg_lat_queue)
 
   def exe(self):
     """
