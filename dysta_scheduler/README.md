@@ -11,3 +11,10 @@ bash script/sanger_multisparse_scheduling.sh
 # you can also enable the debug info, or draw lat distbution
 python simulator.py --schedule_method fcfs prema --debug --draw_dist
 ```
+
+## Evaluate Dysta
+Run the following script:
+```
+bash script/dysta_comparison_sanger.sh
+```
+You can check the generate pdf `Metrics_rate**_sample**.pdf`

@@ -6,8 +6,13 @@ import copy
 from bench_sanger_v3 import calc_sanger_latency
 import matplotlib.pyplot as plt
 import os
+from itertools import islice
 
 PRIORITY_LIST = [1, 3, 9] # PREMA's priority scheme
+
+def take(n, iterable):
+    """Return the first n items of the iterable as a list."""
+    return list(islice(iterable, n))
 
 def generate_reqst_table(arrival_rate, num_samples, model_list, lat_lut, sampling_method='Poisson'):
   """
@@ -144,7 +149,7 @@ class Task:
     self.finish_time = -1 # initialize as -1
     self.model_str = model_str
     self.real_lat_queue = []
-    self.priority = priority # initialize as -1
+    self.priority = priority
     self.urgency = -1 # For SDRM use
     self.map_score = -1 # For SDRM use
     self.prema_last_exe_time = self.reqst_time # For PREMA use
