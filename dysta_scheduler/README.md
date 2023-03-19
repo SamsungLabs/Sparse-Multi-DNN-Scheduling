@@ -12,9 +12,16 @@ bash script/sanger_multisparse_scheduling.sh
 python simulator.py --schedule_method fcfs prema --debug --draw_dist
 ```
 
-## Evaluate Dysta
+## Evaluate Dysta Scheduling
 Run the following script:
 ```
-bash script/dysta_comparison_sanger.sh
+bash script/dysta_comparison_sanger_w_pred.sh
 ```
 You can check the generate pdf `Metrics_rate**_sample**.pdf`
+
+## Evaluate Dysta Latency Predictor
+Run the following script:
+```
+bash script/dysta_lat_pred_draw_correlation.sh 
+```
+You can check the generate pdf `**corr_matrix.pdf` for the correlation matrix, and output log for the accuracy of our predictor
