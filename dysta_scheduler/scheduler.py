@@ -1,6 +1,7 @@
-from utils import Task
+from utils import Task, take
 import logging
 import numpy as np
+from dysta_lat_pred import avg_pred_linear_rate, last_one_pred_linear_rate, last_N_pred_linear_rate
 
 class Scheduler:
   def __init__(self, reqst_table):
@@ -24,15 +25,17 @@ class Scheduler:
   def calc_violation_rate(self):
     assert self.is_finished() # Check if all finished
     num_violate_tasks = 0
-    violate_task_list = [] #[(reqst, target, model_str), ....]
+    violate_task_dict = {} #[(reqst, target, model_str), ....]
     for task_id, task_info in self.finished_reqst.items():
       if task_info.finish_time > task_info.target_time:
         num_violate_tasks += 1
-        violate_task_list.append({"reqst_time": task_info.reqst_time, "target_time:": task_info.target_time, 
-                      "finsh_time:": task_info.finish_time, "task_id": task_id})
+        violate_task_dict[task_info.reqst_time] = {"reqst_time:": task_info.reqst_time, 
+            "target_time:": task_info.target_time, "finsh_time:": task_info.finish_time, "task_id": task_id}
+    # Sort the violate task dict according to request time
+    violate_task_dict = {k: v for k, v in sorted(violate_task_dict.items(), key=lambda item: item[0])}
     violation_rate = num_violate_tasks/self.num_reqst
     assert (violation_rate >= 0) and (violation_rate <= 1)
-    return violation_rate, violate_task_list
+    return violation_rate, violate_task_dict
 
   def calc_system_thrpt(self):
     """
@@ -43,7 +46,7 @@ class Scheduler:
     for task_id,task_info in self.finished_reqst.items():
       if last_finish_time <= task_info.finish_time:
         last_finish_time = task_info.finish_time
-    first_reqst_time, _, _, _, _, _ = self.reqst_table[0]
+    first_reqst_time, _, _, _, _, _, _ = self.reqst_table[0]
     exec_time_total = last_finish_time - first_reqst_time
     system_thrpt = self.num_reqst / exec_time_total
     
@@ -67,13 +70,13 @@ class Scheduler:
 
   def __push_reqst(self, reqst_indx):
     # Read the new input request
-    reqst_time, target_lat, reqst_model, priority, avg_lat, sample_id = self.reqst_table[reqst_indx]
+    reqst_time, target_lat, reqst_model, priority, avg_lat, sample_id, avg_sparsity = self.reqst_table[reqst_indx]
     
     # Construct a new task
-    new_task = Task(reqst_time, target_lat, reqst_model, priority, avg_lat)
+    new_task = Task(reqst_time, target_lat, reqst_model, priority, avg_lat, avg_sparsity)
 
 
-    new_task.construct_task(self.lat_lut[reqst_model]['lat_lut'][sample_id])
+    new_task.construct_task(self.lat_lut[reqst_model]['lat_lut'][sample_id], self.lat_lut[reqst_model]['sparsity_lut'][sample_id])
     task_id = str(reqst_time) + "_" + reqst_model # log using arrival time and model name
     
     # Add task into running tasks
@@ -84,7 +87,7 @@ class Scheduler:
   def update_reqst(self):
     if (self.cur_reqst_indx < self.num_reqst): 
       # request info: req_time, target_lat, model, priority
-      reqst_time, target_lat, reqst_model, priority, avg_lat, sample_id = self.reqst_table[self.cur_reqst_indx]
+      reqst_time, target_lat, reqst_model, priority, avg_lat, sample_id, avg_sparsity = self.reqst_table[self.cur_reqst_indx]
       
       # No running task, push the nearest request
       if (len(self.running_task) == 0): 
@@ -100,7 +103,7 @@ class Scheduler:
           # Update request info
           self.cur_reqst_indx += 1
           if (self.cur_reqst_indx >= self.num_reqst): break
-          reqst_time, target_lat, reqst_model, priority, avg_lat, sample_id = self.reqst_table[self.cur_reqst_indx]
+          reqst_time, target_lat, reqst_model, priority, avg_lat, sample_id, avg_sparsity = self.reqst_table[self.cur_reqst_indx]
     else:
       pass
   
@@ -108,11 +111,11 @@ class Scheduler:
   def update_schedule(self):
     raise NotImplementedError()
 
-  def exe(self): # Per-layer granularity
+  def exe(self, is_hw_monitor=False): # Per-layer granularity
     task_id = self.update_schedule() # id of the scheduled task
-    lat_consumed = self.running_task[task_id].exe() # latency of the executed layer
+    lat_consumed = self.running_task[task_id].exe(is_hw_monitor) # latency of the executed layer
     self.sys_time += lat_consumed
-    self.running_task[task_id].prema_last_exe_time = self.sys_time
+    self.running_task[task_id].last_exe_time = self.sys_time
     # Check any finished task
     if (self.running_task[task_id].is_finished(self.sys_time)):
       self.finished_reqst[task_id] = self.running_task[task_id]
@@ -175,7 +178,7 @@ class PREMA_Scheduler(Scheduler):
         max_task_id = task_id
       else: 
         # Line 7 in PREMA paper, Algorithm 2
-        idle_time =  self.sys_time - task.prema_last_exe_time
+        idle_time =  self.sys_time - task.last_exe_time
         if self.is_sparse:
           slowdown_rate = idle_time / task.real_isolated_time # TODO - latest idle time or overall waiting time?
         else:
@@ -207,7 +210,7 @@ class PREMA_Scheduler(Scheduler):
       if self.is_sparse:
         estimated_time = sum(self.running_task[task_id].real_lat_queue) # Use real sparsity to estimate lat
       else:
-        estimated_time = sum(self.running_task[task_id].prema_est_lat_queue) # Use estimate avg (PREMA) lat  
+        estimated_time = sum(self.running_task[task_id].est_lat_queue) # Use estimate avg (PREMA) lat  
       if len(candidate_tasks) > 1:
         logging.debug("task in candidate:%s with estimated time:%f" % (task_id, estimated_time))
       if ((next_task_id is None) or (shortest_time > estimated_time)): 
@@ -217,40 +220,154 @@ class PREMA_Scheduler(Scheduler):
     return next_task_id
     # logging.debug("next task:%s, sys time:%f" % (next_task_id, self.sys_time))
 
-
 class Dysta_Scheduler(Scheduler):
   """
-  This scheduler implements our proposed approach.
+  This scheduler implements our HW&SW co-deisng approach with latency predictor used while schuduling.
+  Used to simulate the real hardware execution process of our approach
   """
-  def __init__(self,reqst_table):
+  def __init__(self,reqst_table, penalty_eff=1.0, num_candidate=5, beta=0.01):
     super().__init__(reqst_table)
-    print ("Constructing Dysta Scheduler.")
+    print ("Constructing Dysta HWSW Scheduler.")
+    self.penalty_eff = penalty_eff
+    self.num_candidate = num_candidate
+    self.beta = beta # Parameter used to control weighting of each metrics
 
   def reset(self, reqst_table):
     self.__init__(reqst_table)
 
   def update_schedule(self):
     next_task_id = None
-    highest_urgency = -1
-    max_map_score = -1
     for task_id,task in self.running_task.items():
-      
+      # Update gamma
+      num_exe_layer = len(task.dysta_measured_sparsities)
+      if (num_exe_layer > 0):
+        # Last one predictor because: (Check dysta_lat_pred.py for details.) 
+        #     1. it has the lower RMSE
+        #     2. Lower resource consumption (Momeory and computation).
+        # task.gamma = avg_pred_linear_rate(task.dysta_measured_sparsities, task.dysta_avg_sparsities)
+        # task.gamma = last_N_pred_linear_rate(task.dysta_measured_sparsities, task.dysta_avg_sparsities)
+        task.gamma = last_one_pred_linear_rate(task.dysta_measured_sparsities, task.dysta_avg_sparsities)
+
       # Calculate urgency
-      remain_lat =  task.target_time - self.sys_time
+      slack_time =  task.target_time - self.sys_time
       torun_lat = sum(task.real_lat_queue)
-      task.urgency = torun_lat/remain_lat
-      task.urgency = 1 if task.urgency > 1 else task.urgency
-      
-      if ((highest_urgency < 0) or (highest_urgency <= task.urgency)): 
-        if ((highest_urgency == task.urgency) and (self.running_task[next_task_id].reqst_time < task.reqst_time)):
-          # If with the same, use FCFS
-          continue
-        else:
-          next_task_id = task_id
-          highest_urgency = task.urgency
-    logging.debug("next task:%s, sys time:%f" % (next_task_id, self.sys_time))
+      task.dysta_urgency = slack_time - torun_lat
+      if (task.dysta_urgency < 0): task.dysta_urgency = 0
+
+      # Calculate preemption penalty, two purpose: 
+      #     1. Avoid task switch as it cause extra resource consumtion; 
+      #     2. Encourage to resume the last execute task as it has higher possibility to yeild higher ANTT
+      idle_time =  self.sys_time - task.last_exe_time
+      penalty_preemption = idle_time / task.real_isolated_time # TODO - latest idle time or overall waiting time?
+      # Normalize preemption by the number of processes
+      penalty_preemption /= len(self.running_task)
+      task.dysta_score = task.dysta_urgency + penalty_preemption # - penalty_vio
+
+    # Get next token according to shorted estimated time
+    shortest_time = -1
+    for task_id, task in self.running_task.items():
+      estimated_time = task.dysta_gamma * sum(task.est_lat_queue) # Use real sparsity to estimate lat
+      estimated_time = estimated_time + self.beta * task.dysta_score # / task.priority
+      logging.debug("choose candidate:%s, score:%f"%(task_id, estimated_time))
+      if ((next_task_id is None) or (shortest_time > estimated_time)): 
+        next_task_id = task_id
+        shortest_time = estimated_time 
+        
+    logging.debug("next task of dysta_oracle:%s, sys time:%f" % (next_task_id, self.sys_time))
     return next_task_id
 
+
+
+class Dysta_Oracle_Scheduler(Scheduler):
+  """
+  This scheduler implements our scheduling approach based on oracle latency information.
+  Used to investigate what is the optimal performance can achieved.
+  """
+  def __init__(self,reqst_table, penalty_eff=1.0, num_candidate=5, beta=0.01):
+    super().__init__(reqst_table)
+    print ("Constructing Dysta Scheduler that uses oracle latency information for scheduling.")
+    self.penalty_eff = penalty_eff
+    self.num_candidate = num_candidate
+    self.beta = beta # Parameter used to control weighting of each metrics
+
+  def reset(self, reqst_table):
+    self.__init__(reqst_table)
+
+  def cal_violate_rate(self, sys_time, exe_task_id=None):
+    """
+    Calculate violation rate given the current sys_time.
+    """
+    num_running_task = len(self.running_task)
+    num_violate_tasks = 0
+    for task_id,task in self.running_task.items():
+      est_lat = sum(self.running_task[task_id].real_lat_queue)
+      est_finish_time = sys_time + est_lat
+      if (est_finish_time > self.running_task[task_id].target_time):
+        if (exe_task_id==None) or (task_id != exe_task_id):
+          num_violate_tasks += 1 
+    vio_rate = num_violate_tasks / num_running_task
+    return vio_rate
+
+  def update_schedule(self):
+    next_task_id = None
+    cur_vio_rate = self.cal_violate_rate(self.sys_time)
+    task_score_list = {}
+    for task_id,task in self.running_task.items():
+      # Calculate violation penalty
+      # Comment out because this metircs does not help. But keep this if we need in the furture
+      '''
+      lookahead_sys_time = self.sys_time + self.running_task[task_id].real_lat_queue[0]  # Add the exe time of the next layer on top ofsys_time 
+      lookahead_vio_rate = self.cal_violate_rate(lookahead_sys_time, task_id)
+      dif_vio_rate = lookahead_vio_rate - cur_vio_rate
+      penalty_vio = self.penalty_eff * dif_vio_rate
+      '''
+
+      # Calculate urgency
+      slack_time =  task.target_time - self.sys_time
+      torun_lat = sum(task.real_lat_queue)
+      task.dysta_urgency = slack_time - torun_lat
+      if (task.dysta_urgency < 0): task.dysta_urgency = 0
+
+      # Calculate preemption penalty, two purpose: 
+      #     1. Avoid task switch as it cause extra resource consumtion; 
+      #     2. Encourage to resume the last execute task as it has higher possibility to yeild higher ANTT
+      idle_time =  self.sys_time - task.last_exe_time
+      penalty_preemption = idle_time / task.real_isolated_time # TODO - latest idle time or overall waiting time?
+      # Normalize preemption by the number of processes
+      penalty_preemption /= len(self.running_task)
+      task.dysta_score = task.dysta_urgency + penalty_preemption # - penalty_vio
+
+      # Get average score
+      # Comment out because choosing from candidate does not help. But keep this if we need in the furture
+      '''
+      task_score = task.dysta_urgency - penalty_vio + slowdown_rate
+      task_score_list[task_id] = task_score
+      logging.debug("task_id:%s, task_score:%f, task_ddl:%f, lookahead_sys_time:%f, remain_time:%f, torun_time:%f"%(task_id, task_score, task.target_time, lookahead_sys_time, slack_time, torun_lat))
+      logging.debug("task.dysta_urgency:%f, penalty_vio_rate:%f, slowdown_rate:%f" % (task.dysta_urgency, penalty_vio, slowdown_rate))
+      '''
+    # Sort the task list by score, 
+    # Comment out because choosing from candidate does not help. But keep this if we need in the furture
+    '''
+    sorted_task_score_list = {k: v for k, v in sorted(task_score_list.items(), key=lambda item: item[1], reverse=True)}
+    candidate_tasks = {}
+    for k, v in sorted_task_score_list.items():
+      if len(candidate_tasks) >= self.num_candidate: break
+      else: 
+        candidate_tasks[k] = v
+    '''
+
+    # Get next token according to shorted estimated time
+    shortest_time = -1
+    for task_id, task in self.running_task.items():
+      estimated_time = sum(self.running_task[task_id].real_lat_queue) # Use real sparsity to estimate lat
+      estimated_time = estimated_time + self.beta * task.dysta_score # / task.priority
+      logging.debug("choose candidate:%s, score:%f"%(task_id, estimated_time))
+      if ((next_task_id is None) or (shortest_time > estimated_time)): 
+        next_task_id = task_id
+        shortest_time = estimated_time 
+        
+    logging.debug("next task of dysta_oracle:%s, sys time:%f" % (next_task_id, self.sys_time))
+    return next_task_id
 
 class SDRM3_Scheduler(Scheduler):
   """
@@ -271,27 +388,56 @@ class SDRM3_Scheduler(Scheduler):
     for task_id,task in self.running_task.items():
       
       # Calculate urgency
-      remain_lat =  task.target_time - self.sys_time
-      torun_lat = sum(task.prema_est_lat_queue)
-      task.urgency = torun_lat/remain_lat
-      task.urgency = 1 if task.urgency > 1 else task.urgency
+      slack_time =  task.target_time - self.sys_time
+      torun_lat = sum(task.est_lat_queue)
+      task.sdrm_urgency = torun_lat/slack_time
+      task.sdrm_urgency = 1 if task.sdrm_urgency > 1 else task.sdrm_urgency
 
       # Calculate fairness
-      idle_time =  self.sys_time - task.prema_last_exe_time
-      task.fairness = idle_time / task.prema_est_lat_queue[0]
+      idle_time =  self.sys_time - task.last_exe_time
+      task.fairness = idle_time / task.est_lat_queue[0]
 
       # Calculate MapScore
-      task.map_score = task.urgency + self.alpha * task.fairness
+      task.map_score = task.sdrm_urgency + self.alpha * task.fairness
 
-      # if ((highest_urgency < 0) or (highest_urgency <= task.urgency)): 
+      # if ((highest_urgency < 0) or (highest_urgency <= task.sdrm_urgency)): 
       if ((max_map_score < 0) or (max_map_score <= task.map_score)):
-        # if ((highest_urgency == task.urgency) and (self.running_task[next_task_id].reqst_time < task.reqst_time)):
+        # if ((highest_urgency == task.sdrm_urgency) and (self.running_task[next_task_id].reqst_time < task.reqst_time)):
         if ((max_map_score == task.map_score) and (self.running_task[next_task_id].reqst_time < task.reqst_time)):
           # If with the same, use FCFS
           continue
         else:
           next_task_id = task_id
-          highest_urgency = task.urgency
+          highest_urgency = task.sdrm_urgency
           max_map_score = task.map_score
+    logging.debug("next task:%s, sys time:%f" % (next_task_id, self.sys_time))
+    return next_task_id
+
+class SJF_Scheduler(Scheduler):
+  """
+  This scheduler implements Shortest Estimated Job First (SJF)
+  """
+  def __init__(self,reqst_table, is_sparse = False):
+    super().__init__(reqst_table)
+    self.is_sparse = is_sparse
+    print ("Constructing SJF Scheduler.")
+
+  def reset(self, reqst_table):
+    self.__init__(reqst_table)
+
+  def update_schedule(self):
+    next_task_id = None
+    shortest_time = -1
+    for task_id, task in self.running_task.items():
+      if self.is_sparse:
+        estimated_time = sum(self.running_task[task_id].real_lat_queue) # Use real sparsity to estimate lat
+      else:
+        estimated_time = sum(self.running_task[task_id].est_lat_queue) # Use estimate avg (PREMA) lat  
+      slack_time =  task.target_time - self.sys_time
+      torun_lat = sum(task.real_lat_queue)
+      logging.debug("task in candidate:%s with estimated time:%f, target time:%f, slack time:%f, torun time:%f" % (task_id, estimated_time, task.target_time, slack_time, torun_lat))
+      if ((next_task_id is None) or (shortest_time > estimated_time)): 
+        next_task_id = task_id
+        shortest_time = estimated_time
     logging.debug("next task:%s, sys time:%f" % (next_task_id, self.sys_time))
     return next_task_id

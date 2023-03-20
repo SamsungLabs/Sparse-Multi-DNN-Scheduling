@@ -1,4 +1,4 @@
-from scheduler import FCFS_Scheduler, Dysta_Scheduler, PREMA_Scheduler, SDRM3_Scheduler
+from scheduler import *
 from utils import generate_reqst_table, construct_lat_table
 import sys
 import argparse
@@ -15,10 +15,13 @@ GREY_DARKER = "#5C5B5D"
 RED = "#E3120B"
 
 scheduler_dict = {"fcfs": FCFS_Scheduler,
+                  "dysta_oracle": Dysta_Oracle_Scheduler,
                   "dysta": Dysta_Scheduler,
                   "prema_sparse": PREMA_Scheduler,
                   "prema": PREMA_Scheduler,
                   "sdrm3": SDRM3_Scheduler,
+                  "sjf":SJF_Scheduler,
+                  "sjf_sparse":SJF_Scheduler,
                   }
 
 def simulation(args):
@@ -32,37 +35,32 @@ def simulation(args):
             "antt":{}}
   # Evaluate each scheduler
   for lat_slo_mult in args.lat_slo_mult:
-    # if (lat_slo_mult == 3):
-    #   print ("enable debug mode")
-    #   logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
-    # else:
-    #   logging.basicConfig(stream=sys.stdout, level=logging.INFO)
     reqst_table = reqst_table_base.copy()
     # Update target target_lat using lat_slo_mult
     logging.info("*************** Creating new reqst tables using lat_slo_mult:%f ***************", lat_slo_mult)
     for reqst in reqst_table:
       reqst[1] = reqst[1] * lat_slo_mult # The second element reqst[1] is the target lat
-      logging.debug("The target lat:%f" % (reqst[1]))
+      logging.debug("The reqst_time:%f, target lat:%f, model_str:%s" % (reqst[0], reqst[1], reqst[2]))
     # Handle request using different schedulers 
     for scheduler_name in args.schedule_method:
       print ("-"*100)
       if str.endswith(scheduler_name, "sparse"): scheduler = scheduler_dict[scheduler_name](reqst_table, is_sparse=True)
       elif 'sdrm3' in scheduler_name: scheduler = scheduler_dict[scheduler_name](reqst_table, alpha=args.alpha)
+      elif 'dysta_oracle' in scheduler_name: scheduler = scheduler_dict[scheduler_name](reqst_table, args.vio_penalty_eff, args.num_candidate, args.beta)
       else: scheduler = scheduler_dict[scheduler_name](reqst_table)
       scheduler.set_lat_lut(lat_lut)
       while (not scheduler.is_finished()):
         scheduler.update_reqst()
-        scheduler.exe()
+        scheduler.exe(is_hw_monitor=(scheduler_name == 'dysta'))
 
       # Get violation rate
-      violation_rate, violate_task_list = scheduler.calc_violation_rate()
+      violation_rate, violate_task_dict = scheduler.calc_violation_rate()
       if scheduler_name not in metrics["vio_rate"]: metrics["vio_rate"][scheduler_name] = [violation_rate]
       else: metrics["vio_rate"][scheduler_name].append(violation_rate)
 
       print ("Violation rate of ", scheduler_name, " scheduling:", violation_rate)
-      for i in range(len(violate_task_list)):
-        print ("Violate task:", violate_task_list[i])
-
+      for k, v in violate_task_dict.items():
+        print ("Violate task:", v)
       system_thrpt = scheduler.calc_system_thrpt()
       print(f"System Throughput (STP): {system_thrpt:.2f} inf/s")
       if scheduler_name not in metrics["thrpt"]: metrics["thrpt"][scheduler_name] = [system_thrpt]
@@ -75,7 +73,7 @@ def simulation(args):
       print ("-"*100)
   # Drawing figs using obtained metrics
   fig, axs = plt.subplots(nrows=1, ncols=3, figsize=(18, 2.0))
-  COLORS = [BLUE, GREEN, BROWN_DARKER, GREY, RED]
+  COLORS = [GREY, BLUE, GREEN, BROWN, BROWN_DARKER, GREY_DARKER, RED]
   tick_font_size = 9
   label_font_size = 13
   for i, (k, v) in enumerate(metrics.items()):
@@ -92,7 +90,7 @@ def simulation(args):
     # ax.set_title(metric_name,y=0, pad=-53, fontsize = label_font_size)#, fontweight="bold"
     if i==0: 
         ax.legend(ncol=3, loc='lower left', bbox_to_anchor=(0.0, 1.0), prop={'size': label_font_size-1})
-  fig.savefig("Metrics.pdf", bbox_inches='tight')
+  fig.savefig("Metrics_rate" + str(args.sample_per_sec) + "_sample" + str(args.num_sample) + ".pdf", bbox_inches='tight')
       
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description="Simulator for scheduling sparse multi-DNN workloads on sparse DNN accelerators.")
@@ -104,18 +102,22 @@ if __name__ == '__main__':
                       help="The input sequence length for Transformer models.")
   parser.add_argument("--csv_lat_files", nargs='+', default="bert_lat.csv", type=str,
                       help="The measured latencies of the supplied model(s) on the target accelerator.")
-  parser.add_argument("--schedule_method", nargs='+', default="fcfs", type=str, choices=["fcfs", "dysta", "prema_sparse", "prema", "sdrm3"],
+  parser.add_argument("--schedule_method", nargs='+', default="fcfs", type=str, choices=["fcfs", "dysta_oracle", "dysta", "prema_sparse", "prema", "sdrm3", "sjf_sparse", "sjf"],
                       help="The name(s) of the evaluated scheduling method(s).")
   parser.add_argument("--alpha", default=0.0, type=float, 
                       help="The fairness weight for SDRM3's MapScore metric.")
+  parser.add_argument("--beta", default=0.01, type=float, 
+                      help="The parameter used to control weighting of each metrics in Dysta scheduler")
   parser.add_argument("--sample_per_sec", default=30, type=int, 
                       help="The input arrival rate in samples (or tasks) per second.")
-  parser.add_argument("--num_sample", default=200, type=int, 
+  parser.add_argument("--num_sample", default=30, type=int, 
                       help="The total number of samples to simulate.")
   parser.add_argument("--lat_slo_mult", nargs='+', default=1.0, type=float,
                       help="Sets the target latency SLO as Mean Isolated Latency x SLO Multiplier (the supplied parameter). Typical values: 1.0 (unattainable), 10 (strict), 100 (loose).")
-  # parser.add_argument("--lat_estimate_mean", action='store_true', default=False,
-  #                     help="Use the mean per-layer latency as the latency estimate rather than the actual latency due to the variability in sparsity. Currently, it affects both the scheduling decisions and the accelerator remains idle.")
+  parser.add_argument("--vio_penalty_eff", default=1.0, type=float, 
+                      help="Dysta parameter to control the effect of violation penalty.")
+  parser.add_argument("--num_candidate", default=5, type=int, 
+                      help="Dysta parameter to control the number of candidates after obtaining the score.")                     
   parser.add_argument("--draw_dist", action="store_true")
   parser.add_argument("--figs_path", default="./", type=str, help="The path to all saved figures/images")
 
