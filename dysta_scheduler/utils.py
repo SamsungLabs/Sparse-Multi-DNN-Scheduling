@@ -30,7 +30,7 @@ def generate_reqst_table(arrival_rate, num_samples, model_list, lat_lut, samplin
   """
   reqst_table = []
   if sampling_method == 'Poisson': 
-    # Each trial follow Exponential (Bernoulli) distribtution, the counting results follow Poisson (Binominal)
+    # Each trial follows Exponential (Bernoulli) distribution, the counting results follow Poisson (Binominal)
     reqst_time = 0.0
     num_models = len(model_list)
     num_priority = len(PRIORITY_LIST)
@@ -155,14 +155,14 @@ class Task:
     # Common properties
     self.reqst_time = reqst_time
     self.target_time = self.reqst_time + target_lat # target end time
-    self.real_isolated_time = -1 # isolated time using real sparsity, initalize as -1, updated in construct_task()
-    self.est_isolated_time = -1 # isolated time without knowing real sparsity, initalize as -1, updated in construct_task()
+    self.real_isolated_time = -1 # Isolated time using real sparsity, initalize as -1, updated in construct_task()
+    self.est_isolated_time = -1 # Isolated time without knowing real sparsity, initalize as -1, updated in construct_task()
     self.finish_time = -1 # initialize as -1
     self.model_str = model_str
     self.real_lat_queue = []
     self.priority = priority
     self.last_exe_time = self.reqst_time 
-    self.est_lat_queue = list(avg_lat) # Estimated latency, Initialized as the average latency
+    self.est_lat_queue = list(avg_lat) # Estimated latency, initialized as the average latency
 
     # For Dysta use
     self.dysta_urgency = -1
@@ -170,14 +170,14 @@ class Task:
     self.dysta_avg_sparsities = avg_sparsity
     self.real_sparsities = []
     self.dysta_measured_sparsities = []
-    self.dysta_gamma = 1.0 # The ratio betten average sparsity and mesure sparsity, used to estimate the latency queue
+    self.dysta_gamma = 1.0 # The ratio betten average and measured sparsity, used to estimate the latency queue
 
     # For SDRM use
-    self.sdrm_urgency = -1 # For SDRM use
-    self.sdrm_map_score = -1 # For SDRM use
+    self.sdrm_urgency = -1
+    self.sdrm_map_score = -1
 
     # For PREMA use
-    self.prema_token = -1 # For PREMA use
+    self.prema_token = -1
 
   def construct_task(self, lat_table, sparsity_table):
     """ 
@@ -205,7 +205,7 @@ class Task:
 
   def is_finished(self, sys_time):
     """
-    Checkes whether all layers of the model 
+    Checks whether all layers of the model 
     have been executed.
     """
     if (len(self.real_lat_queue) == 0):

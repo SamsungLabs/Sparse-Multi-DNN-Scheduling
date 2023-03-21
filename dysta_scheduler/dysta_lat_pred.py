@@ -1,5 +1,5 @@
 from scheduler import *
-from utils import generate_reqst_table, construct_lat_table
+from utils import construct_lat_table
 import sys
 import argparse
 import logging
@@ -13,6 +13,14 @@ COLAR_MAPS = ['inferno', 'bone', 'viridis', 'magma', 'cividis']
 FIG_INDX = ['(a)', '(b)', '(c)', '(d)', '(d)']
 
 def avg_pred_linear_rate(measured_sparsities, avg_sparsities):
+  """
+  This estimator uses the average of the ratios between the real and average output sparsity 
+  of all already executed layers in the task to predict the sparse latency of the current layer.
+
+  Args:
+    measured_sparsities: Actual sparsity of each already executed layer in the task.
+    avg_spartsities: Average sparsity of each layer in the task across the target dataset. 
+  """
   num_exe_layer = len(measured_sparsities)
   linear_rate = 1.0
   if (num_exe_layer > 0):
@@ -21,12 +29,20 @@ def avg_pred_linear_rate(measured_sparsities, avg_sparsities):
       sparsity_ratio = (1 - measured_sparsities[i]) / (1 - avg_sparsities[i])
       sparsity_ratios.append(sparsity_ratio)
     linear_rate = sum(sparsity_ratios) / num_exe_layer # Average the ratio to get linear rate
-    # print ("aavg value:",  linear_rate, " sparsity ratio list:", sparsity_ratios)
+    # print ("avg value:",  linear_rate, " sparsity ratio list:", sparsity_ratios)
     # print ("sparsity measured list:",  measured_sparsities, " sparsity real list:", avg_sparsities)
   return linear_rate
 
 
 def last_one_pred_linear_rate(measured_sparsities, avg_sparsities):
+  """
+  This estimator uses the ratio between the real and average output sparsity 
+  of the previous layer in the task to predict the sparse latency of the current layer.
+  
+  Args:
+    measured_sparsities: Actual sparsity of each already executed layer in the task.
+    avg_spartsities: Average sparsity of each layer in the task across the target dataset. 
+  """
   num_exe_layer = len(measured_sparsities)
   linear_rate = 1.0
   if (num_exe_layer > 0):
@@ -37,6 +53,14 @@ def last_one_pred_linear_rate(measured_sparsities, avg_sparsities):
   return linear_rate
 
 def last_N_pred_linear_rate(measured_sparsities, avg_sparsities, window_size=3):
+  """
+  This estimator uses the average of the ratios between the real and average output sparsity 
+  of the last N already executed layers in the task to predict the sparse latency of the current layer.
+
+  Args:
+    measured_sparsities: Actual sparsity of each already executed layer in the task.
+    avg_spartsities: Average sparsity of each layer in the task across the target dataset. 
+  """
   num_exe_layer = len(measured_sparsities)
   linear_rate = 1.0
   if (num_exe_layer > 0):
@@ -61,6 +85,7 @@ def lat_pred(args):
       ax = axs[n]
       batch_sparsity_dict = v['sparsity_lut']
       num_layers = len(batch_sparsity_dict[0])
+      
       # Analyse corelation of sparsity among different layers
       layer_sparsity_list = []
       num_batch = len(batch_sparsity_dict)
@@ -92,7 +117,7 @@ def lat_pred(args):
       cbar.ax.tick_params(labelsize=label_size)
     plt.savefig(os.path.join(args.figs_path, "sparsity_corr_matrix.pdf"))
 
-  # Calculate the accuracy of dysta lat predictor
+  # Calculate the accuracy of Dysta's lat predictor
   for n, (model_key, v) in enumerate(task_lut.items()):
     for predictor in ['avg', 'lastN', 'last_one']:
       batch_sparsity_dict = copy.deepcopy(v['sparsity_lut'])
@@ -102,7 +127,7 @@ def lat_pred(args):
       sum_abs_error_lat = 0
       sum_rel_error_lat = 0
       num_samples = 0
-      sum_mse = 0 # Mean squared erro
+      sum_mse = 0 # Mean-square error
       for batch_no, real_sparsity in batch_sparsity_dict.items():
         num_layers = len(real_sparsity)
         measured_sparsities = [real_sparsity.pop(0)]
@@ -128,7 +153,7 @@ def lat_pred(args):
       avg_abs_error = sum_abs_error_lat / num_samples
       avg_rel_error = sum_rel_error_lat / num_samples
       mse = sum_mse / num_samples
-      rmse = math.sqrt(mse)
+      rmse = math.sqrt(mse) # Root-mean-square error
       print ("Averaged abs error of %s with %s predictor: abs error %f, rel error %f, mse %f, rmse %f"% (model_key, predictor, avg_abs_error, avg_rel_error, mse, rmse))
     
 

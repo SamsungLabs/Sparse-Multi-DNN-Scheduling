@@ -8,7 +8,7 @@ class Scheduler:
     self.sys_time = 0.0
     self.reqst_table = reqst_table # [(req_time1, target_lat1, model1), (req_time2, target_lat2, model2), ....]
     self.cur_reqst_indx = 0
-    self.running_task = {} #{{task_id1: task1}, {task_id2: task2} ...}
+    self.running_task = {} # {{task_id1: task1}, {task_id2: task2} ...}
     self.finished_reqst = {}
     self.num_reqst= len(self.reqst_table)
     self.lat_lut = {}
@@ -25,7 +25,7 @@ class Scheduler:
   def calc_violation_rate(self):
     assert self.is_finished() # Check if all finished
     num_violate_tasks = 0
-    violate_task_dict = {} #[(reqst, target, model_str), ....]
+    violate_task_dict = {} # [(reqst, target, model_str), ....]
     for task_id, task_info in self.finished_reqst.items():
       if task_info.finish_time > task_info.target_time:
         num_violate_tasks += 1
@@ -222,15 +222,15 @@ class PREMA_Scheduler(Scheduler):
 
 class Dysta_Scheduler(Scheduler):
   """
-  This scheduler implements our HW&SW co-deisng approach with latency predictor used while schuduling.
-  Used to simulate the real hardware execution process of our approach
+  This scheduler implements our HW-SW co-design approach with sparse latency predictor used while scheduling.
+  Used to simulate the real hardware execution of our approach.
   """
   def __init__(self,reqst_table, penalty_eff=1.0, num_candidate=5, beta=0.01):
     super().__init__(reqst_table)
-    print ("Constructing Dysta HWSW Scheduler.")
+    print ("Constructing Dysta HW/SW Scheduler.")
     self.penalty_eff = penalty_eff
     self.num_candidate = num_candidate
-    self.beta = beta # Parameter used to control weighting of each metrics
+    self.beta = beta # Parameter used to control weighting of each metric
 
   def reset(self, reqst_table):
     self.__init__(reqst_table)
@@ -255,7 +255,7 @@ class Dysta_Scheduler(Scheduler):
       if (task.dysta_urgency < 0): task.dysta_urgency = 0
 
       # Calculate preemption penalty, two purpose: 
-      #     1. Avoid task switch as it cause extra resource consumtion; 
+      #     1. Avoid task switch as it cause extra resource consumption; 
       #     2. Encourage to resume the last execute task as it has higher possibility to yeild higher ANTT
       idle_time =  self.sys_time - task.last_exe_time
       penalty_preemption = idle_time / task.real_isolated_time # TODO - latest idle time or overall waiting time?
@@ -281,14 +281,14 @@ class Dysta_Scheduler(Scheduler):
 class Dysta_Oracle_Scheduler(Scheduler):
   """
   This scheduler implements our scheduling approach based on oracle latency information.
-  Used to investigate what is the optimal performance can achieved.
+  Used to investigate what is the optimal attainable performance.
   """
   def __init__(self,reqst_table, penalty_eff=1.0, num_candidate=5, beta=0.01):
     super().__init__(reqst_table)
     print ("Constructing Dysta Scheduler that uses oracle latency information for scheduling.")
     self.penalty_eff = penalty_eff
     self.num_candidate = num_candidate
-    self.beta = beta # Parameter used to control weighting of each metrics
+    self.beta = beta # Parameter used to control weighting of each metric
 
   def reset(self, reqst_table):
     self.__init__(reqst_table)
@@ -314,7 +314,7 @@ class Dysta_Oracle_Scheduler(Scheduler):
     task_score_list = {}
     for task_id,task in self.running_task.items():
       # Calculate violation penalty
-      # Comment out because this metircs does not help. But keep this if we need in the furture
+      # Comment out because these metrics do not help. But keep this, in case we need it in the furture.
       '''
       lookahead_sys_time = self.sys_time + self.running_task[task_id].real_lat_queue[0]  # Add the exe time of the next layer on top ofsys_time 
       lookahead_vio_rate = self.cal_violate_rate(lookahead_sys_time, task_id)
@@ -328,9 +328,9 @@ class Dysta_Oracle_Scheduler(Scheduler):
       task.dysta_urgency = slack_time - torun_lat
       if (task.dysta_urgency < 0): task.dysta_urgency = 0
 
-      # Calculate preemption penalty, two purpose: 
-      #     1. Avoid task switch as it cause extra resource consumtion; 
-      #     2. Encourage to resume the last execute task as it has higher possibility to yeild higher ANTT
+      # Calculate preemption penalty, two purposes: 
+      #     1. Avoid task switch as it can cause extra resource consumption.
+      #     2. Encourage resuming the already running task as it has higher probability to yield higher ANTT.
       idle_time =  self.sys_time - task.last_exe_time
       penalty_preemption = idle_time / task.real_isolated_time # TODO - latest idle time or overall waiting time?
       # Normalize preemption by the number of processes
@@ -338,15 +338,15 @@ class Dysta_Oracle_Scheduler(Scheduler):
       task.dysta_score = task.dysta_urgency + penalty_preemption # - penalty_vio
 
       # Get average score
-      # Comment out because choosing from candidate does not help. But keep this if we need in the furture
+      # Comment out because choosing from candidate does not help. But keep this in case we need it in the furture.
       '''
       task_score = task.dysta_urgency - penalty_vio + slowdown_rate
       task_score_list[task_id] = task_score
       logging.debug("task_id:%s, task_score:%f, task_ddl:%f, lookahead_sys_time:%f, remain_time:%f, torun_time:%f"%(task_id, task_score, task.target_time, lookahead_sys_time, slack_time, torun_lat))
       logging.debug("task.dysta_urgency:%f, penalty_vio_rate:%f, slowdown_rate:%f" % (task.dysta_urgency, penalty_vio, slowdown_rate))
       '''
-    # Sort the task list by score, 
-    # Comment out because choosing from candidate does not help. But keep this if we need in the furture
+    # Sort the task list by score 
+    # Comment out because choosing from candidate does not help. But keep this, in case we need it in the furture.
     '''
     sorted_task_score_list = {k: v for k, v in sorted(task_score_list.items(), key=lambda item: item[1], reverse=True)}
     candidate_tasks = {}
@@ -415,7 +415,7 @@ class SDRM3_Scheduler(Scheduler):
 
 class SJF_Scheduler(Scheduler):
   """
-  This scheduler implements Shortest Estimated Job First (SJF)
+  This scheduler implements Shortest Estimated Job First (SJF).
   """
   def __init__(self,reqst_table, is_sparse = False):
     super().__init__(reqst_table)

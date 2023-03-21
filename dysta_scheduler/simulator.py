@@ -46,7 +46,7 @@ def simulation(args):
       print ("-"*100)
       if str.endswith(scheduler_name, "sparse"): scheduler = scheduler_dict[scheduler_name](reqst_table, is_sparse=True)
       elif 'sdrm3' in scheduler_name: scheduler = scheduler_dict[scheduler_name](reqst_table, alpha=args.alpha)
-      elif 'dysta_oracle' in scheduler_name: scheduler = scheduler_dict[scheduler_name](reqst_table, args.vio_penalty_eff, args.num_candidate, args.beta)
+      elif 'dysta' in scheduler_name: scheduler = scheduler_dict[scheduler_name](reqst_table, args.vio_penalty_eff, args.num_candidate, args.beta)
       else: scheduler = scheduler_dict[scheduler_name](reqst_table)
       scheduler.set_lat_lut(lat_lut)
       while (not scheduler.is_finished()):
