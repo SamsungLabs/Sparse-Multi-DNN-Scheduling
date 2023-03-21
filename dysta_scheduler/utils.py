@@ -179,6 +179,9 @@ class Task:
     # For PREMA use
     self.prema_token = -1
 
+    # For Planaria use
+    self.planaria_score = -1
+
   def construct_task(self, lat_table, sparsity_table):
     """ 
     Adds all layers of the model to the task's queue.

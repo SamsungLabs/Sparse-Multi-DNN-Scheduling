@@ -323,7 +323,7 @@ class Dysta_Oracle_Scheduler(Scheduler):
       '''
 
       # Calculate urgency
-      slack_time =  task.target_time - self.sys_time
+      slack_time = task.target_time - self.sys_time
       torun_lat = sum(task.real_lat_queue)
       task.dysta_urgency = slack_time - torun_lat
       if (task.dysta_urgency < 0): task.dysta_urgency = 0
@@ -331,7 +331,7 @@ class Dysta_Oracle_Scheduler(Scheduler):
       # Calculate preemption penalty, two purposes: 
       #     1. Avoid task switch as it can cause extra resource consumption.
       #     2. Encourage resuming the already running task as it has higher probability to yield higher ANTT.
-      idle_time =  self.sys_time - task.last_exe_time
+      idle_time = self.sys_time - task.last_exe_time
       penalty_preemption = idle_time / task.real_isolated_time # TODO - latest idle time or overall waiting time?
       # Normalize preemption by the number of processes
       penalty_preemption /= len(self.running_task)
@@ -388,13 +388,13 @@ class SDRM3_Scheduler(Scheduler):
     for task_id,task in self.running_task.items():
       
       # Calculate urgency
-      slack_time =  task.target_time - self.sys_time
+      slack_time = task.target_time - self.sys_time
       torun_lat = sum(task.est_lat_queue)
       task.sdrm_urgency = torun_lat/slack_time
       task.sdrm_urgency = 1 if task.sdrm_urgency > 1 else task.sdrm_urgency
 
       # Calculate fairness
-      idle_time =  self.sys_time - task.last_exe_time
+      idle_time = self.sys_time - task.last_exe_time
       task.fairness = idle_time / task.est_lat_queue[0]
 
       # Calculate MapScore
@@ -439,5 +439,34 @@ class SJF_Scheduler(Scheduler):
       if ((next_task_id is None) or (shortest_time > estimated_time)): 
         next_task_id = task_id
         shortest_time = estimated_time
+    logging.debug("next task:%s, sys time:%f" % (next_task_id, self.sys_time))
+    return next_task_id
+
+class Planaria(Scheduler):
+  """
+  This scheduler implements Planaria (MICRO 2020).
+  """
+  def __init__(self,reqst_table, is_sparse=False):
+    super().__init__(reqst_table)
+    print ("Constructing Planaria Scheduler.")
+
+  def reset(self, reqst_table):
+    self.__init__(reqst_table)
+
+  def update_schedule(self):
+    next_task_id = None
+    max_score = -1
+    for task_id,task in self.running_task.items():
+      slack_time = task.target_time - self.sys_time # Equivalent to L39 of Alg. 1 if we add task.reqst_time to both terms
+      rsc_estimate = 1 # For our setup without spatial co-location, set to 1 for all tasks
+      task.planaria_score = task.priority / (slack_time * rsc_estimate) # Uses 11 priority levels. Might need to revise.
+
+      if ((max_score < 0) or (max_score <= task.planaria_score)):
+        if ((max_score == task.planaria_score) and (self.running_task[next_task_id].reqst_time < task.reqst_time)):
+          # If with the same, use FCFS
+          continue
+        else:
+          next_task_id = task_id
+          max_score = task.planaria_score
     logging.debug("next task:%s, sys time:%f" % (next_task_id, self.sys_time))
     return next_task_id

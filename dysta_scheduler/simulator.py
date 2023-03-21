@@ -20,8 +20,9 @@ scheduler_dict = {"fcfs": FCFS_Scheduler,
                   "prema_sparse": PREMA_Scheduler,
                   "prema": PREMA_Scheduler,
                   "sdrm3": SDRM3_Scheduler,
-                  "sjf":SJF_Scheduler,
-                  "sjf_sparse":SJF_Scheduler,
+                  "sjf": SJF_Scheduler,
+                  "sjf_sparse": SJF_Scheduler,
+                  "planaria": Planaria, 
                   }
 
 def simulation(args):
@@ -102,7 +103,7 @@ if __name__ == '__main__':
                       help="The input sequence length for Transformer models.")
   parser.add_argument("--csv_lat_files", nargs='+', default="bert_lat.csv", type=str,
                       help="The measured latencies of the supplied model(s) on the target accelerator.")
-  parser.add_argument("--schedule_method", nargs='+', default="fcfs", type=str, choices=["fcfs", "dysta_oracle", "dysta", "prema_sparse", "prema", "sdrm3", "sjf_sparse", "sjf"],
+  parser.add_argument("--schedule_method", nargs='+', default="fcfs", type=str, choices=["fcfs", "dysta_oracle", "dysta", "prema_sparse", "prema", "sdrm3", "sjf_sparse", "sjf", "planaria"],
                       help="The name(s) of the evaluated scheduling method(s).")
   parser.add_argument("--alpha", default=0.0, type=float, 
                       help="The fairness weight for SDRM3's MapScore metric.")
