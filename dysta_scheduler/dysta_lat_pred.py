@@ -1,5 +1,5 @@
 from scheduler import *
-from utils import construct_lat_table
+from utils import generate_reqst_table, construct_lat_table
 import sys
 import argparse
 import logging
@@ -85,7 +85,7 @@ def lat_pred(args):
       ax = axs[n]
       batch_sparsity_dict = v['sparsity_lut']
       num_layers = len(batch_sparsity_dict[0])
-      
+
       # Analyse corelation of sparsity among different layers
       layer_sparsity_list = []
       num_batch = len(batch_sparsity_dict)

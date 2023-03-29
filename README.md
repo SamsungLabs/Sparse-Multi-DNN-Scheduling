@@ -14,4 +14,5 @@ pip install torch==1.11.0+cu113 torchvision==0.12.0+cu113 torchaudio==0.11.0 --e
 Other dependencies:
 ```
 pip install matplotlib pandas
+pip install sparseml
 ```

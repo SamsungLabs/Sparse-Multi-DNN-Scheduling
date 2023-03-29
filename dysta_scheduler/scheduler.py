@@ -250,7 +250,7 @@ class Dysta_Scheduler(Scheduler):
 
       # Calculate urgency
       slack_time =  task.target_time - self.sys_time
-      torun_lat = sum(task.est_lat_queue)
+      torun_lat = task.dysta_gamma * sum(task.est_lat_queue)
       task.dysta_urgency = slack_time - torun_lat
       if (task.dysta_urgency < 0): task.dysta_urgency = 0
 

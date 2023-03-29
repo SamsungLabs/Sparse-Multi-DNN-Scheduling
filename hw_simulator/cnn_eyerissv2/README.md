@@ -1,0 +1,1 @@
+We use [SparseML](https://docs.neuralmagic.com/products/sparseml) to get sparse CNN models prunned by different patterns such as random, N-M and filter/channel.
