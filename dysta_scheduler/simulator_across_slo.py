@@ -25,6 +25,21 @@ scheduler_dict = {"fcfs": FCFS_Scheduler,
                   "planaria": Planaria, 
                   }
 
+scheduler_names = {"fcfs": "FCFS",
+                  "dysta_oracle": "Dysta Oracle",
+                  "dysta": "Dysta",
+                  "prema_sparse": "PREMA-sparse",
+                  "prema": "PREMA",
+                  "sdrm3": "SDRM3",
+                  "sjf": "SJF",
+                  "sjf_sparse": "SJF-sparse",
+                  "planaria": "Planaria", 
+                  }
+metric_names = {"vio_rate": "SLO Violation Rate (%)",
+                "thrpt": "System Throughput (inf/s)",
+                "antt": "ANTT"
+                }
+
 def simulation(args):
   # Construct latency Look-Up Table (LUT)
   #   {"model_str": {"lat_lut": {{batch_no: [lat_layer1, lat_layer2, ...], batch_no: [lat_layer1, lat_layer2, ...]}}, "mean_lat": float}, ....}
@@ -73,25 +88,41 @@ def simulation(args):
       else: metrics["antt"][scheduler_name].append(antt)
       print ("-"*100)
   # Drawing figs using obtained metrics
-  fig, axs = plt.subplots(nrows=1, ncols=3, figsize=(18, 2.0))
+  fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(18, 2.0))
   COLORS = [GREY, BLUE, GREEN, BROWN, BROWN_DARKER, GREY_DARKER, RED]
   tick_font_size = 9
   label_font_size = 13
+  axis_idx = 0
   for i, (k, v) in enumerate(metrics.items()):
     metric_name = k
+    
+    # Skip system throughput
+    if 'thrpt' in metric_name:
+      continue
+
     # Get subplot
-    ax = axs[i]
+    ax = axs[axis_idx]
     for j, (s, results) in enumerate(v.items()):
-      schedule_name = s
-      ax.plot(args.lat_slo_mult, results, color=COLORS[j], lw=1.5, label=schedule_name)
-    ax.set_xlabel('lat_slo_mult', fontsize = label_font_size)
-    ax.set_ylabel(metric_name, fontsize = label_font_size)
+      schedule_name = scheduler_names[s] 
+      ax.plot(
+        args.lat_slo_mult, 
+        results, 
+        color=COLORS[j], 
+        lw=1.5, 
+        label=schedule_name, 
+        marker='o',
+        )
+
+    ax.set_xlabel('Latency SLO multiplier', fontsize = label_font_size)
+    ylabel_name = metric_names[metric_name]
+    ax.set_ylabel(ylabel_name, fontsize = label_font_size)
     ax.tick_params(axis='both', labelsize=tick_font_size)
     ax.grid()
     # ax.set_title(metric_name,y=0, pad=-53, fontsize = label_font_size)#, fontweight="bold"
-    if i==0: 
-        ax.legend(ncol=3, loc='lower left', bbox_to_anchor=(0.0, 1.0), prop={'size': label_font_size-1})
-  fig.savefig("Metrics_rate" + str(args.sample_per_sec) + "_sample" + str(args.num_sample) + ".pdf", bbox_inches='tight')
+    if axis_idx==0: 
+      ax.legend(ncol=6, loc='lower left', bbox_to_anchor=(0.0, 1.0), prop={'size': label_font_size-1})
+    axis_idx += 1
+  fig.savefig("Metrics_rate" + str(args.sample_per_sec) + "_sample" + str(args.num_sample) + "_across_slo.pdf", bbox_inches='tight')
       
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description="Simulator for scheduling sparse multi-DNN workloads on sparse DNN accelerators.")

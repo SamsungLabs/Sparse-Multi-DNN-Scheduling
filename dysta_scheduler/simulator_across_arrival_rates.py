@@ -25,73 +25,104 @@ scheduler_dict = {"fcfs": FCFS_Scheduler,
                   "planaria": Planaria, 
                   }
 
+scheduler_names = {"fcfs": "FCFS",
+                  "dysta_oracle": "Dysta Oracle",
+                  "dysta": "Dysta",
+                  "prema_sparse": "PREMA-sparse",
+                  "prema": "PREMA",
+                  "sdrm3": "SDRM3",
+                  "sjf": "SJF",
+                  "sjf_sparse": "SJF-sparse",
+                  "planaria": "Planaria", 
+                  }
+metric_names = {"vio_rate": "SLO Violation Rate (%)",
+                "thrpt": "Throughput (inf/s)",
+                "antt": "ANTT"
+                }
+
 def simulation(args):
   # Construct latency Look-Up Table (LUT)
-  #   {"model_str": {"lat_lut": {{batch_no: [lat_layer1, lat_layer2, ...], batch_no: [lat_layer1, lat_layer2, ...]}}, "mean_lat": float}, ....}
+    #   {"model_str": {"lat_lut": {{batch_no: [lat_layer1, lat_layer2, ...], batch_no: [lat_layer1, lat_layer2, ...]}}, "mean_lat": float}, ....}
   lat_lut = construct_lat_table(args.models, args.csv_lat_files, args)
-  reqst_table_base = generate_reqst_table(args.sample_per_sec, args.num_sample, args.models, lat_lut)
- 
   metrics = {"vio_rate":{},
-            "thrpt":{},
-            "antt":{}}
-  # Evaluate each scheduler
-  for lat_slo_mult in args.lat_slo_mult:
-    reqst_table = reqst_table_base.copy()
-    # Update target target_lat using lat_slo_mult
-    logging.info("*************** Creating new reqst tables using lat_slo_mult:%f ***************", lat_slo_mult)
-    for reqst in reqst_table:
-      reqst[1] = reqst[1] * lat_slo_mult # The second element reqst[1] is the target lat
-      logging.debug("The reqst_time:%f, target lat:%f, model_str:%s" % (reqst[0], reqst[1], reqst[2]))
-    # Handle request using different schedulers 
-    for scheduler_name in args.schedule_method:
-      print ("-"*100)
-      if str.endswith(scheduler_name, "sparse"): scheduler = scheduler_dict[scheduler_name](reqst_table, is_sparse=True)
-      elif 'sdrm3' in scheduler_name: scheduler = scheduler_dict[scheduler_name](reqst_table, alpha=args.alpha)
-      elif 'dysta' in scheduler_name: scheduler = scheduler_dict[scheduler_name](reqst_table, args.vio_penalty_eff, args.num_candidate, args.beta)
-      else: scheduler = scheduler_dict[scheduler_name](reqst_table)
-      scheduler.set_lat_lut(lat_lut)
-      while (not scheduler.is_finished()):
-        scheduler.update_reqst()
-        scheduler.exe(is_hw_monitor=(scheduler_name == 'dysta'))
+              "thrpt":{},
+              "antt":{}}
+  for samples_per_sec in args.sample_per_sec:
+    
+    reqst_table_base = generate_reqst_table(samples_per_sec, args.num_sample, args.models, lat_lut)
+  
+    # Evaluate each scheduler
+    for lat_slo_mult in args.lat_slo_mult:
+      reqst_table = reqst_table_base.copy()
+      # Update target target_lat using lat_slo_mult
+      logging.info("*************** Creating new reqst tables using lat_slo_mult:%f ***************", lat_slo_mult)
+      for reqst in reqst_table:
+        reqst[1] = reqst[1] * lat_slo_mult # The second element reqst[1] is the target lat
+        logging.debug("The reqst_time:%f, target lat:%f, model_str:%s" % (reqst[0], reqst[1], reqst[2]))
+      # Handle request using different schedulers 
+      for scheduler_name in args.schedule_method:
+        print ("-"*100)
+        if str.endswith(scheduler_name, "sparse"): scheduler = scheduler_dict[scheduler_name](reqst_table, is_sparse=True)
+        elif 'sdrm3' in scheduler_name: scheduler = scheduler_dict[scheduler_name](reqst_table, alpha=args.alpha)
+        elif 'dysta' in scheduler_name: scheduler = scheduler_dict[scheduler_name](reqst_table, args.vio_penalty_eff, args.num_candidate, args.beta)
+        else: scheduler = scheduler_dict[scheduler_name](reqst_table)
+        scheduler.set_lat_lut(lat_lut)
+        while (not scheduler.is_finished()):
+          scheduler.update_reqst()
+          scheduler.exe(is_hw_monitor=(scheduler_name == 'dysta'))
 
-      # Get violation rate
-      violation_rate, violate_task_dict = scheduler.calc_violation_rate()
-      if scheduler_name not in metrics["vio_rate"]: metrics["vio_rate"][scheduler_name] = [violation_rate]
-      else: metrics["vio_rate"][scheduler_name].append(violation_rate)
+        # Get violation rate
+        violation_rate, violate_task_dict = scheduler.calc_violation_rate()
+        if scheduler_name not in metrics["vio_rate"]: metrics["vio_rate"][scheduler_name] = [violation_rate]
+        else: metrics["vio_rate"][scheduler_name].append(violation_rate)
 
-      print ("Violation rate of ", scheduler_name, " scheduling:", violation_rate)
-      for k, v in violate_task_dict.items():
-        print ("Violate task:", v)
-      system_thrpt = scheduler.calc_system_thrpt()
-      print(f"System Throughput (STP): {system_thrpt:.2f} inf/s")
-      if scheduler_name not in metrics["thrpt"]: metrics["thrpt"][scheduler_name] = [system_thrpt]
-      else: metrics["thrpt"][scheduler_name].append(system_thrpt)
+        print ("Violation rate of ", scheduler_name, " scheduling:", violation_rate)
+        for k, v in violate_task_dict.items():
+          print ("Violate task:", v)
+        system_thrpt = scheduler.calc_system_thrpt()
+        print(f"System Throughput (STP): {system_thrpt:.2f} inf/s")
+        if scheduler_name not in metrics["thrpt"]: metrics["thrpt"][scheduler_name] = [system_thrpt]
+        else: metrics["thrpt"][scheduler_name].append(system_thrpt)
 
-      antt = scheduler.calc_ANTT()
-      print(f"Average Normalised Turnaround Time (ANTT): {antt:.2f}")
-      if scheduler_name not in metrics["antt"]: metrics["antt"][scheduler_name] = [antt]
-      else: metrics["antt"][scheduler_name].append(antt)
-      print ("-"*100)
+        antt = scheduler.calc_ANTT()
+        print(f"Average Normalised Turnaround Time (ANTT): {antt:.2f}")
+        if scheduler_name not in metrics["antt"]: metrics["antt"][scheduler_name] = [antt]
+        else: metrics["antt"][scheduler_name].append(antt)
+        print ("-"*100)
+
+  print(f"Metris Dict: {metrics}")
   # Drawing figs using obtained metrics
   fig, axs = plt.subplots(nrows=1, ncols=3, figsize=(18, 2.0))
   COLORS = [GREY, BLUE, GREEN, BROWN, BROWN_DARKER, GREY_DARKER, RED]
   tick_font_size = 9
   label_font_size = 13
+  axis_idx = 0
   for i, (k, v) in enumerate(metrics.items()):
     metric_name = k
+
     # Get subplot
-    ax = axs[i]
+    ax = axs[axis_idx]
     for j, (s, results) in enumerate(v.items()):
-      schedule_name = s
-      ax.plot(args.lat_slo_mult, results, color=COLORS[j], lw=1.5, label=schedule_name)
-    ax.set_xlabel('lat_slo_mult', fontsize = label_font_size)
-    ax.set_ylabel(metric_name, fontsize = label_font_size)
+      schedule_name = scheduler_names[s] 
+      ax.plot(
+        args.sample_per_sec, 
+        results, 
+        color=COLORS[j], 
+        lw=1.5, 
+        label=schedule_name, 
+        marker='o',
+        )
+
+    ax.set_xlabel('Arrival Rate (samples/s)', fontsize = label_font_size)
+    ylabel_name = metric_names[metric_name]
+    ax.set_ylabel(ylabel_name, fontsize = label_font_size)
     ax.tick_params(axis='both', labelsize=tick_font_size)
     ax.grid()
     # ax.set_title(metric_name,y=0, pad=-53, fontsize = label_font_size)#, fontweight="bold"
-    if i==0: 
-        ax.legend(ncol=3, loc='lower left', bbox_to_anchor=(0.0, 1.0), prop={'size': label_font_size-1})
-  fig.savefig("Metrics_rate" + str(args.sample_per_sec) + "_sample" + str(args.num_sample) + ".pdf", bbox_inches='tight')
+    if axis_idx==0: 
+      ax.legend(ncol=6, loc='lower left', bbox_to_anchor=(0.0, 1.0), prop={'size': label_font_size-1})
+    axis_idx += 1
+  fig.savefig("Metrics_rate" + str(args.sample_per_sec) + "_slo" + str(args.lat_slo_mult) + "_sample" + str(args.num_sample) + "_across_arrival_rates.pdf", bbox_inches='tight')
       
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description="Simulator for scheduling sparse multi-DNN workloads on sparse DNN accelerators.")
@@ -109,7 +140,7 @@ if __name__ == '__main__':
                       help="The fairness weight for SDRM3's MapScore metric.")
   parser.add_argument("--beta", default=0.01, type=float, 
                       help="The parameter used to control weighting of each metrics in Dysta scheduler")
-  parser.add_argument("--sample_per_sec", default=30, type=int, 
+  parser.add_argument("--sample_per_sec", nargs='+', default=30, type=int, 
                       help="The input arrival rate in samples (or tasks) per second.")
   parser.add_argument("--num_sample", default=30, type=int, 
                       help="The total number of samples to simulate.")
