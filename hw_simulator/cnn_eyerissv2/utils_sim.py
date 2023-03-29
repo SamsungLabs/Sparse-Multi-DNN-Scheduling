@@ -6,6 +6,13 @@ import logging
 from hw_eyerissv2 import EyerissV2
 
 def cal_sparsity_tensor(t):
+  '''
+  Calculate the sparsity of input tensor
+
+  Args:
+  t: Input tensor, with type 'pytorch.tensor'
+  '''
+
   num_pixel = torch.numel(t)
   if (t.dtype is torch.float32):
     num_nonzero = torch.count_nonzero(t)
@@ -18,6 +25,10 @@ def cal_sparsity_tensor(t):
 
 
 class Stat_Collector_Eyerissv2:
+  '''
+  Hook class for the simulation of Eyeriss-V2. Build an Eyeriss-V2 simulator for each hook. 
+  All hooks have the same HW parameters (PE rows/columns ets.), but using different mapping strategies.
+  '''
   def __init__(self, m):
     self.handle = m.register_forward_hook(self.hook_fn)
     self.sparsity = 0.0
@@ -60,9 +71,14 @@ class Stat_Collector_Eyerissv2:
   def remove(self):
     self.handle.remove()
 
-# Insert hook of every "target_module"
-# Return the inserted model and intermediate result 
 def insert_hook_simulator(model, target_module_list):
+  '''
+  Insert hook on every target module in "target_module"
+  Return the inserted model and intermediate results
+
+  Args:
+  target_module_list: List of target_modules to insert hook/simulator. For example, Conv2D, Lienar.
+  '''
   intern_outputs = []
   for layer in model.modules():
     for target_module in target_module_list:

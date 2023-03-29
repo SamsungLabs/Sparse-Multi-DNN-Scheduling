@@ -22,7 +22,10 @@ import os
 from tqdm.auto import tqdm
 
 def run_sim(args):
-
+  '''
+  Iterate the dataset using the sparse models.
+  Use hook to capture the intermedate results, then feed to Eyeriss-V2 simulator to get performance.
+  '''
   # Get model name
   model_name = args.load_model_path.split('/')[-1].split('.')[0]
   # Load Sparse torch model
