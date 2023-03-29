@@ -73,7 +73,7 @@ def simulation(args):
       print ("-"*100)
   # Drawing figs using obtained metrics
   fig, axs = plt.subplots(nrows=1, ncols=3, figsize=(18, 2.0))
-  COLORS = [GREY, BLUE, GREEN, BROWN, BROWN_DARKER, GREY_DARKER, RED]
+  COLORS = [GREY, GREY_DARKER,BROWN, BROWN_DARKER, BLUE, GREEN, RED]
   tick_font_size = 9
   label_font_size = 13
   for i, (k, v) in enumerate(metrics.items()):
