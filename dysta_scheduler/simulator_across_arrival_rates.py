@@ -13,6 +13,8 @@ BLUE = "#076FA1"
 GREY = "#C7C9CB"
 GREY_DARKER = "#5C5B5D"
 RED = "#E3120B"
+SALMON = '#E9967A'
+THISTLE = '#D8BFD8'	
 
 scheduler_dict = {"fcfs": FCFS_Scheduler,
                   "dysta_oracle": Dysta_Oracle_Scheduler,
@@ -35,10 +37,24 @@ scheduler_names = {"fcfs": "FCFS",
                   "sjf_sparse": "SJF-sparse",
                   "planaria": "Planaria", 
                   }
+
 metric_names = {"vio_rate": "SLO Violation Rate (%)",
                 "thrpt": "Throughput (inf/s)",
                 "antt": "ANTT"
                 }
+
+scheduler_colors = {"fcfs": GREY,
+                  "dysta_oracle": RED,
+                  "dysta": GREY_DARKER,
+                  "prema_sparse": SALMON,
+                  "prema": GREEN,
+                  "sdrm3": BROWN_DARKER,
+                  "sjf": BLUE,
+                  "sjf_sparse": THISTLE,
+                  "planaria": BROWN, 
+                  }
+
+
 
 def simulation(args):
   # Construct latency Look-Up Table (LUT)
@@ -107,7 +123,7 @@ def simulation(args):
       ax.plot(
         args.sample_per_sec, 
         results, 
-        color=COLORS[j], 
+        color=scheduler_colors[s], #COLORS[j], 
         lw=1.5, 
         label=schedule_name, 
         marker='o',
