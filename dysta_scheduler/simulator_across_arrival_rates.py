@@ -108,7 +108,7 @@ def simulation(args):
 
   print(f"Metris Dict: {metrics}")
   # Drawing figs using obtained metrics
-  fig, axs = plt.subplots(nrows=1, ncols=3, figsize=(18, 2.0))
+  fig, axs = plt.subplots(nrows=1, ncols=4, figsize=(18, 2.0))
   COLORS = [GREY, BLUE, GREEN, BROWN, BROWN_DARKER, GREY_DARKER, RED]
   tick_font_size = 9
   label_font_size = 13
@@ -138,6 +138,24 @@ def simulation(args):
     if axis_idx==0: 
       ax.legend(ncol=6, loc='lower left', bbox_to_anchor=(0.0, 1.0), prop={'size': label_font_size-1})
     axis_idx += 1
+
+  
+  ax = axs[axis_idx]
+  print('===================', metrics['vio_rate'])
+  for j, (sl,an) in enumerate(zip(metrics['vio_rate'].items(),metrics['antt'].items())):
+    assert(sl[0]==an[0])
+    schedule_name = scheduler_names[sl[0]] 
+    ax.plot(
+        sl[1],
+        an[1],  
+        color= scheduler_colors[sl[0]], # COLORS[j], 
+        lw=1.5, 
+        label=schedule_name, 
+        marker='.',
+        )
+  ax.set_xlabel(metric_names['vio_rate'], fontsize = label_font_size)
+  ax.set_ylabel(metric_names['antt'], fontsize = label_font_size)
+
   fig.savefig("Metrics_rate" + str(args.sample_per_sec) + "_slo" + str(args.lat_slo_mult) + "_sample" + str(args.num_sample) + "_across_arrival_rates.pdf", bbox_inches='tight')
       
 if __name__ == '__main__':
