@@ -1,0 +1,1 @@
+python sparsity_pattern_analysis.py --dataset_root /path/to/dataset --figs_path /path/to/figs/  --model_name resnet mobilenetv1

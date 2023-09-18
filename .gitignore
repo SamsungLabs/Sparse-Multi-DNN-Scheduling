@@ -1,0 +1,11 @@
+/dataset_sparsity/models
+/dataset_sparsity/data_example
+/dataset_sparsity/ICCV_MAET
+*__pycache__*
+*csv
+*pyc
+*pdf
+*txt
+*pt
+*sparse_logs*
+*rpt
